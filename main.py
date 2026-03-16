@@ -6,6 +6,7 @@ import array
 import time
 import network
 import socket
+import gc
 
 # Initializations
 DATA_PIN = 4
@@ -19,7 +20,7 @@ OFF = (0, 0, 0)
 YELLOW = (255, 150, 0)
 RED = (255, 0, 0)
 
-# PIO NeoPixel Driver, optimized for Raspberry Pi Pico 2
+# PIO NeoPixel driver for Raspberry Pi Pico 2
 @rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
 def ws2812():
     T1, T2, T3 = 2, 5, 3
@@ -39,8 +40,8 @@ sm.active(1)
 # Internal buffer
 pixel_data = array.array("I", [0 for _ in range(NUM_LEDS)])
 
-# Set color and brightness
 def set_sign(color):
+    """Applies brightness, converts RGB to GRB, and sends to PIO."""
     r, g, b = color
     
     # Apply brightness
@@ -60,16 +61,17 @@ def set_sign(color):
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    wlan.connect(SSID, PASSWORD)
-    print("Connecting to WiFi", end="")
-    while not wlan.isconnected():
-        print(".", end="")
-        time.sleep(0.5)
+    if not wlan.isconnected():
+        wlan.connect(SSID, PASSWORD)
+        print("Connecting to WiFi", end="")
+        while not wlan.isconnected():
+            print(".", end="")
+            time.sleep(0.5)
     ip = wlan.ifconfig()[0]
     print(f"\nConnected! IP: {ip}")
     return ip
 
-# Main
+# Start server
 ip = connect_wifi()
 set_sign(OFF)
 
@@ -81,17 +83,30 @@ s.listen(5)
 print(f"Listening on http://{ip}")
 
 while True: 
+    gc.collect() # Periodically clean up memory
+    
     conn = None
     try:
+        # Check WiFi status and reconnect if needed
+        if not network.WLAN(network.STA_IF).isconnected():
+            print("WiFi lost, reconnecting...")
+            connect_wifi()
+
         conn, client_addr = s.accept()
-        request = conn.recv(1024).decode() # Non-blocking receive with a timeout or small buffer size
+        conn.settimeout(3.0) # Prevent hanging on unresponsive clients
         
-        if not request:
+        raw_request = conn.recv(1024)
+        if not raw_request:
             continue
 
-        # Parse HTTP request
         try:
-            path = request.split(" ")[1] if len(request.split(" ")) > 1 else ""
+            request = raw_request.decode("utf-8")
+        except UnicodeError:
+            continue # Skip malformed binary requests
+
+        # Extract path from HTTP request
+        try:
+            path = request.split(" ")[1]
         except IndexError:
             path = ""
 
