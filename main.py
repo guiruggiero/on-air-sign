@@ -14,6 +14,12 @@ NUM_LEDS = 12
 BRIGHTNESS = 0.3  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
+RESPONSES = {
+    "/off": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF",
+    "/yellow": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW",
+    "/red": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED",
+}
+NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
 
 # Colors (R, G, B)
 OFF = (0, 0, 0)
@@ -58,8 +64,8 @@ def set_sign(color):
     time.sleep_ms(10) # Brief settle time to ensure the PIO FIFO buffer is cleared
 
 # Connect to WiFi
+wlan = network.WLAN(network.STA_IF)
 def connect_wifi():
-    wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
         wlan.connect(SSID, PASSWORD)
@@ -82,6 +88,7 @@ s = socket.socket()
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(addr)
 s.listen(5)
+s.settimeout(5.0)
 print(f"Listening on http://{ip}")
 
 while True: 
@@ -90,14 +97,14 @@ while True:
     conn = None
     try:
         # Check WiFi status and reconnect if needed
-        if not network.WLAN(network.STA_IF).isconnected():
+        if not wlan.isconnected():
             print("WiFi lost, reconnecting...")
             connect_wifi()
 
         conn, client_addr = s.accept()
         conn.settimeout(3.0) # Prevent hanging on unresponsive clients
-        
-        raw_request = conn.recv(1024)
+
+        raw_request = conn.recv(256) # Get first line
         if not raw_request:
             continue
 
@@ -108,30 +115,30 @@ while True:
 
         # Extract path from HTTP request
         try:
-            path = request.split(" ")[1]
+            first_line = request.split("\r\n")[0]  # e.g. "GET /yellow HTTP/1.1"
+            parts = first_line.split(" ")
+            path = parts[1] if len(parts) >= 2 else ""
         except IndexError:
             path = ""
 
-        response_text = "Not Found"
-        status = "404 Not Found"
+        # Send HTTP response
+        response = RESPONSES.get(path, NOT_FOUND)
 
         if path == "/off":
             set_sign(OFF)
-            response_text = "OFF"
-            status = "200 OK"
         elif path == "/yellow":
             set_sign(YELLOW)
-            response_text = "YELLOW"
-            status = "200 OK"
         elif path == "/red":
             set_sign(RED)
-            response_text = "RED"
-            status = "200 OK"
 
-        # Send HTTP response
-        response = f"HTTP/1.0 {status}\r\nContent-Type: text/plain\r\n\r\n{response_text}"
         conn.send(response)
     
+    except OSError as e:
+        if e.args[0] == 110: # ETIMEDOUT, no client connected, loop back
+            pass
+        else:
+            print(f"Server error: {e}")
+
     except Exception as e:
         print(f"Server error: {e}") # TODO: Sentry?
     
