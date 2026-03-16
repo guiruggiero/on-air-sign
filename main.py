@@ -1,32 +1,62 @@
 # Imports
 import secrets
-import neopixel
+import rp2
 from machine import Pin
-import network
+import array
 import time
+import network
 import socket
 
 # Initializations
 DATA_PIN = 4
 NUM_LEDS = 12
+BRIGHTNESS = 0.3  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
 
-# Colors
+# Colors (R, G, B)
 OFF = (0, 0, 0)
-YELLOW = (255, 180, 0)
+YELLOW = (255, 150, 0)
 RED = (255, 0, 0)
 
-# Setup
-np = neopixel.NeoPixel(Pin(DATA_PIN), NUM_LEDS)
+# PIO NeoPixel Driver, optimized for Raspberry Pi Pico 2
+@rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
+def ws2812():
+    T1, T2, T3 = 2, 5, 3
+    wrap_target()
+    label("bitloop")
+    out(x, 1).side(0)[T3 - 1]
+    jmp(not_x, "do_zero").side(1)[T1 - 1]
+    jmp("bitloop").side(1)[T2 - 1]
+    label("do_zero")
+    nop().side(0)[T2 - 1]
+    wrap()
 
-# Set color of all LEDs
+# Initialize StateMachine on the data pin
+sm = rp2.StateMachine(0, ws2812, freq=8_000_000, sideset_base=Pin(DATA_PIN))
+sm.active(1)
+
+# Internal buffer
+pixel_data = array.array("I", [0 for _ in range(NUM_LEDS)])
+
+# Set color and brightness
 def set_sign(color):
+    r, g, b = color
+    
+    # Apply brightness
+    r = int(r * BRIGHTNESS)
+    g = int(g * BRIGHTNESS)
+    b = int(b * BRIGHTNESS)
+    
+    grb = (g << 16) | (r << 8) | b # WS2812 expects GRB order
+    
     for i in range(NUM_LEDS):
-        np[i] = color
-    np.write()
+        pixel_data[i] = grb
+    
+    sm.put(pixel_data, 8)
+    time.sleep_ms(10) # Brief settle time to ensure the PIO FIFO buffer is cleared
 
-# Connect to WiFi
+# Network logic
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
@@ -35,8 +65,9 @@ def connect_wifi():
     while not wlan.isconnected():
         print(".", end="")
         time.sleep(0.5)
-    print("\nConnected! IP:", wlan.ifconfig()[0])
-    return wlan.ifconfig()[0]
+    ip = wlan.ifconfig()[0]
+    print(f"\nConnected! IP: {ip}")
+    return ip
 
 # Main
 ip = connect_wifi()
@@ -47,32 +78,45 @@ s = socket.socket()
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(addr)
 s.listen(5)
-print("Listening on", ip)
+print(f"Listening on http://{ip}")
 
 while True: 
     conn = None
     try:
-        conn, addr = s.accept()
-        request = conn.recv(1024).decode()
+        conn, client_addr = s.accept()
+        request = conn.recv(1024).decode() # Non-blocking receive with a timeout or small buffer size
         
-        path = ""
-        if request:
-            try:
-                path = request.split("\r\n")[0].split(" ")[1]
-            except IndexError:
-                pass # Malformed request, results in 404
+        if not request:
+            continue
+
+        # Parse HTTP request
+        try:
+            path = request.split(" ")[1] if len(request.split(" ")) > 1 else ""
+        except IndexError:
+            path = ""
+
+        response_text = "Not Found"
+        status = "404 Not Found"
 
         if path == "/off":
             set_sign(OFF)
-            conn.send("HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF")
+            response_text = "OFF"
+            status = "200 OK"
         elif path == "/yellow":
             set_sign(YELLOW)
-            conn.send("HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW")
+            response_text = "YELLOW"
+            status = "200 OK"
         elif path == "/red":
             set_sign(RED)
-            conn.send("HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED")
-        else:
-            conn.send("HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found")
+            response_text = "RED"
+            status = "200 OK"
+
+        # Send HTTP response
+        response = f"HTTP/1.0 {status}\r\nContent-Type: text/plain\r\n\r\n{response_text}"
+        conn.send(response)
+    
+    except Exception as e:
+        print(f"Server error: {e}") # TODO: Sentry?
     
     finally:
         if conn:
