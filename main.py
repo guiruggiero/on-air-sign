@@ -37,11 +37,10 @@ def ws2812():
 sm = rp2.StateMachine(0, ws2812, freq=8_000_000, sideset_base=Pin(DATA_PIN))
 sm.active(1)
 
-# Internal buffer
-pixel_data = array.array("I", [0 for _ in range(NUM_LEDS)])
+pixel_data = array.array("I", [0] * NUM_LEDS) # Internal buffer
 
+# Change color of LEDs
 def set_sign(color):
-    """Applies brightness, converts RGB to GRB, and sends to PIO."""
     r, g, b = color
     
     # Apply brightness
@@ -49,15 +48,16 @@ def set_sign(color):
     g = int(g * BRIGHTNESS)
     b = int(b * BRIGHTNESS)
     
-    grb = (g << 16) | (r << 8) | b # WS2812 expects GRB order
+    grb = (g << 16) | (r << 8) | b # Converts to GRB order (expected by WS2812)
     
     for i in range(NUM_LEDS):
         pixel_data[i] = grb
     
-    sm.put(pixel_data, 8)
+    sm.put(pixel_data, 8) # Send to PIO
+
     time.sleep_ms(10) # Brief settle time to ensure the PIO FIFO buffer is cleared
 
-# Network logic
+# Connect to WiFi
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
@@ -67,14 +67,16 @@ def connect_wifi():
         while not wlan.isconnected():
             print(".", end="")
             time.sleep(0.5)
+    
     ip = wlan.ifconfig()[0]
     print(f"\nConnected! IP: {ip}")
     return ip
 
-# Start server
+# Main
 ip = connect_wifi()
 set_sign(OFF)
 
+# Start server
 addr = socket.getaddrinfo("0.0.0.0", 80)[0][-1]
 s = socket.socket()
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
