@@ -44,10 +44,20 @@ function getCurrentSSID() {
 // Get if webcam is in use
 function isCameraInUse() {
     const psCommand = `
-        Get-ChildItem 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam\\NonPackaged' |
-        ForEach-Object { Get-ItemProperty $_.PsPath } |
-        Where-Object { $_.LastUsedTimeStop -eq 0 } |
-        Measure-Object | Select-Object -ExpandProperty Count
+        $paths = @(
+            'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam',
+            'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam\\NonPackaged'
+        )
+        $count = 0
+        foreach ($path in $paths) {
+            if (Test-Path $path) {
+                $count += (Get-ChildItem $path |
+                    ForEach-Object { Get-ItemProperty $_.PsPath } |
+                    Where-Object { $_.LastUsedTimeStop -eq 0 } |
+                    Measure-Object).Count
+            }
+        }
+        $count
     `;
     try {
         const result = execSync(
