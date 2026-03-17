@@ -80,7 +80,7 @@ function isInMeeting() {
     const psCommand = `
         $ProgressPreference = 'SilentlyContinue'
         $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
-        $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime', 'Meet -', 'Meet –', 'Microsoft Teams')
+        $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime:', 'Meet -', 'Meet –', 'Microsoft Teams')
         $found = $false
         foreach ($title in $titles) {
             foreach ($pattern in $meetingPatterns) {
