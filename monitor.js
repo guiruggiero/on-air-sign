@@ -7,7 +7,7 @@ import http from "http";
 // Initializations
 const PICO_IP = process.env.PICO_IP || "<IP>";
 const HOME_SSID = process.env.HOME_SSID || "<networkName>";
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 5000; // 5 seconds
 let currentState = null;
 const STATES = {
     OFF: "off",
@@ -19,6 +19,7 @@ const STATE_ACTIONS = {
     [STATES.YELLOW]: {endpoint: "/yellow", label: "YELLOW 🟡"},
     [STATES.RED]: {endpoint: "/red", label: "RED 🔴"},
 };
+const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Initial check if IP is set
 if (!PICO_IP || PICO_IP === "<IP>") {
@@ -30,9 +31,10 @@ if (!PICO_IP || PICO_IP === "<IP>") {
 function getCurrentSSID() {
     try {
         const result = execSync(
-            `powershell -NoProfile -Command "(netsh wlan show interfaces) | Select-String 'SSID' | Select-Object -First 1"`,
+            `powershell -NoProfile -Command "(netsh wlan show interfaces) | Select-String '(?<!\w)SSID\s' | Select-Object -First 1"`
             {timeout: 5000}
         ).toString().trim();
+        // console.log("getCurrentSSID:", result.split(":").slice(1).join(":").trim());
         return result.split(":").slice(1).join(":").trim(); // Result looks like "  SSID  : MyNetwork"
 
     } catch (e) {
@@ -64,6 +66,7 @@ function isCameraInUse() {
             `powershell -NoProfile -Command "${psCommand}"`,
             {timeout: 5000}
         ).toString().trim();
+        // console.log("isCameraInUse:", parseInt(result) > 0);
         return parseInt(result) > 0;
     
     } catch (e) {
@@ -75,38 +78,8 @@ function isCameraInUse() {
 // Get if any meeting app is in an active call
 function isInMeeting() {
     const psCommand = `
-        Add-Type @"
-        using System;
-        using System.Runtime.InteropServices;
-        using System.Text;
-        using System.Collections.Generic;
-        public class WinAPI {
-            public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-            [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-            [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
-            [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-            public static List<string> GetWindowTitles() {
-                var titles = new List<string>();
-                EnumWindows((hWnd, lParam) => {
-                    if (IsWindowVisible(hWnd)) {
-                        var sb = new StringBuilder(256);
-                        GetWindowText(hWnd, sb, 256);
-                        if (sb.Length > 0) titles.Add(sb.ToString());
-                    }
-                    return true;
-                }, IntPtr.Zero);
-                return titles;
-            }
-        }
-    "@
-        $titles = [WinAPI]::GetWindowTitles()
-        $meetingPatterns = @(
-            'Zoom Meeting',
-            'Huddle',
-            'Amazon Chime',
-            'Meet -',
-            'Meet –'
-        )
+        $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
+        $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime', 'Meet -', 'Meet –', 'Microsoft Teams')
         $found = $false
         foreach ($title in $titles) {
             foreach ($pattern in $meetingPatterns) {
@@ -114,14 +87,14 @@ function isInMeeting() {
             }
             if ($found) { break }
         }
-        if ($found) { "true" }
-        else { "false" }
+        if ($found) { "true" } else { "false" }
     `;
     try {
         const result = execSync(
             `powershell -NoProfile -Command "${psCommand}"`,
             {timeout: 8000}
         ).toString().trim();
+        // console.log("isInMeeting:", result === "true");
         return result === "true";
     
     } catch (e) {
@@ -137,10 +110,12 @@ function callPico(endpoint, label) {
         port: 80,
         path: endpoint,
         method: "GET",
-        timeout: 3000,
     };
     const req = http.request(options, (res) => {
         console.log(`[${new Date().toLocaleTimeString()}] Sign → ${label} (HTTP ${res.statusCode})`);
+    });
+    req.setTimeout(3000, () => {
+        req.destroy(new Error("Request timed out"));
     });
     req.on("error", (e) => console.error("Pico unreachable:", e.message));
     req.end();
@@ -173,6 +148,24 @@ function poll() {
     }
 }
 
+// Chain polls so the next only starts after the current one finishes
+function schedulePoll() {
+    poll();
+    setTimeout(schedulePoll, POLL_INTERVAL_MS);
+}
+
+// Graceful shutdown
+function shutdown() {
+    console.log("\nShutting down — turning sign off...");
+    callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
+    setTimeout(() => process.exit(0), 1500); // Give the HTTP request time to fire
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+setInterval(() => {
+    console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive — current state: ${currentState ?? "none"}`);
+}, HEARTBEAT_INTERVAL_MS);
+
 console.log("Webcam/meeting monitor started. Polling every", POLL_INTERVAL_MS / 1000, "seconds...");
-poll();
-setInterval(poll, POLL_INTERVAL_MS);
+schedulePoll();
