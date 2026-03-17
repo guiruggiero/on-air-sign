@@ -11,7 +11,9 @@ import http from "http";
 // Initializations
 const PICO_IP = process.env.PICO_IP;
 const HOME_SSID = process.env.HOME_SSID;
-const POLL_INTERVAL_MS = 5000; // 5 seconds
+const MEETING_POLL_INTERVAL_MS = 15000; // 15 seconds
+const CAMERA_POLL_INTERVAL_MS = 4000; // 4 seconds
+let cameraPollInterval = null;
 let currentState = null;
 let isAtHome = false;
 const STATES = {
@@ -127,30 +129,8 @@ function callPico(endpoint, label) {
     req.end();
 }
 
-// Monitor meeting and camera status
-function poll() {
-    const inMeeting = isInMeeting();
-    // console.log("isInMeeting:", inMeeting);
-
-    // Not in a meeting
-    if (!inMeeting) {
-        if (currentState !== STATES.OFF && currentState !== null) { // Left a meeting
-            currentState = STATES.OFF;
-            isAtHome = false;
-            callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
-            // console.log(STATE_ACTIONS[STATES.OFF].label);
-        }
-        return;
-    }
-
-    // First poll of a new meeting, check if at home
-    if (currentState === STATES.OFF || currentState === null) {
-        isAtHome = getCurrentSSID() === HOME_SSID;
-        // console.log("isAtHome:", isAtHome);
-    }
-
-    if (!isAtHome) return; // Not at home, do nothing
-
+// Monitor camera status
+function pollCamera() {
     const cameraInUse = isCameraInUse();
     // console.log("isCameraInUse:", cameraInUse);
     const newState = cameraInUse ? STATES.RED : STATES.YELLOW;
@@ -161,10 +141,43 @@ function poll() {
     }
 }
 
+// Monitor meeting status
+function poll() {
+    const inMeeting = isInMeeting();
+    // console.log("isInMeeting:", inMeeting);
+
+    // Not in a meeting
+    if (!inMeeting) {
+        if (currentState !== STATES.OFF && currentState !== null) { // Left a meeting
+            currentState = STATES.OFF;
+            isAtHome = false;
+            if (cameraPollInterval) {
+                clearInterval(cameraPollInterval);
+                cameraPollInterval = null;
+            }
+            callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
+            // console.log(STATE_ACTIONS[STATES.OFF].label);
+        }
+        return;
+    }
+
+    // First poll of a new meeting, check if at home and spin up camera polling
+    if (currentState === STATES.OFF || currentState === null) {
+        isAtHome = getCurrentSSID() === HOME_SSID;
+        // console.log("isAtHome:", isAtHome);
+        if (isAtHome && !cameraPollInterval) {
+            pollCamera(); // Immediate first camera check
+            cameraPollInterval = setInterval(pollCamera, CAMERA_POLL_INTERVAL_MS);
+        }
+    }
+
+    if (!isAtHome) return; // Not at home, do nothing
+}
+
 // Chain polls so the next only starts after the current one finishes
 function schedulePoll() {
     poll();
-    setTimeout(schedulePoll, POLL_INTERVAL_MS);
+    setTimeout(schedulePoll, MEETING_POLL_INTERVAL_MS);
 }
 
 // Graceful shutdown
@@ -181,5 +194,5 @@ setInterval(() => {
     console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive - current state: ${currentState ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
 
-console.log("Meeting/webcam monitor started. Polling every", POLL_INTERVAL_MS / 1000, "seconds...\n");
+console.log("Meeting/webcam monitor started. Polling every", MEETING_POLL_INTERVAL_MS  / 1000, "seconds...\n");
 schedulePoll();
