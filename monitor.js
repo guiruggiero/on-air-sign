@@ -1,12 +1,16 @@
-// Run with `PICO_IP="<IP>" HOME_SSID="<networkName>" node monitor.js`
+// Run with
+//     $env:PICO_IP="<ip_address>"; $env:HOME_SSID="<network_name>"; node .\monitor.js
+// or set env variables with user scope with
+//     [System.Environment]::SetEnvironmentVariable("PICO_IP", "<ip_address>", "User")
+//     [System.Environment]::SetEnvironmentVariable("HOME_SSID", "<network_name>", "User")
 
 // Imports
 import {execSync} from "child_process";
 import http from "http";
 
 // Initializations
-const PICO_IP = process.env.PICO_IP || "<IP>";
-const HOME_SSID = process.env.HOME_SSID || "<networkName>";
+const PICO_IP = process.env.PICO_IP;
+const HOME_SSID = process.env.HOME_SSID;
 const POLL_INTERVAL_MS = 5000; // 5 seconds
 let currentState = null;
 const STATES = {
@@ -165,6 +169,7 @@ function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
+// Heartbeat - TODO: where to store it?
 setInterval(() => {
     console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive — current state: ${currentState ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
