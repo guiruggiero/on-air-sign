@@ -38,7 +38,7 @@ if (!PICO_IP || PICO_IP === "<IP>") {
 function getCurrentSSID() {
     try {
         const result = execSync(
-            `powershell -NoProfile -Command "(netsh wlan show interfaces) | Select-String '(?<!\\w)SSID\\s' | Select-Object -First 1"`,
+            `pwsh -NoProfile -Command "(netsh wlan show interfaces) | Select-String '(?<!\\w)SSID\\s' | Select-Object -First 1"`,
             {timeout: 5000}
         ).toString().trim();
         return result.split(":").slice(1).join(":").trim(); // Result looks like "  SSID  : MyNetwork"
@@ -71,7 +71,7 @@ function isCameraInUse() {
     try {
         const encoded = Buffer.from(psCommand, "utf16le").toString("base64");
         const result = execSync(
-            `powershell -NoProfile -EncodedCommand ${encoded}`,
+            `pwsh -NoProfile -EncodedCommand ${encoded}`,
             {timeout: 5000}
         ).toString().trim();
         return parseInt(result) > 0;
@@ -100,7 +100,7 @@ function isInMeeting() {
     try {
         const encoded = Buffer.from(psCommand, "utf16le").toString("base64");
         const result = execSync(
-            `powershell -NoProfile -EncodedCommand ${encoded}`,
+            `pwsh -NoProfile -EncodedCommand ${encoded}`,
             {timeout: 8000}
         ).toString().trim();
         return result === "true";
