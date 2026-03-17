@@ -45,6 +45,7 @@ function getCurrentSSID() {
 // Get if webcam is in use
 function isCameraInUse() {
     const psCommand = `
+        $ProgressPreference = 'SilentlyContinue'
         $paths = @(
             'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam',
             'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam\\NonPackaged'
@@ -77,6 +78,7 @@ function isCameraInUse() {
 // Get if any meeting app is in an active call
 function isInMeeting() {
     const psCommand = `
+        $ProgressPreference = 'SilentlyContinue'
         $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
         $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime', 'Meet -', 'Meet –', 'Microsoft Teams')
         $found = $false
