@@ -28,9 +28,9 @@ const STATE_ACTIONS = {
 };
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
-// Initial check if IP is set
-if (!PICO_IP || PICO_IP === "<IP>") {
-    console.error("PICO_IP is not set. Please set the PICO_IP env variable");
+// Initial check if env variables are set
+if (!PICO_IP || !HOME_SSID) {
+    console.error("Environment variables not set. Terminating");
     process.exit(1);
 }
 
@@ -189,7 +189,7 @@ function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
-// Heartbeat - TODO: where to store it?
+// Heartbeat
 setInterval(() => {
     console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive - current state: ${currentState ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
