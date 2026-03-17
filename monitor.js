@@ -194,5 +194,5 @@ setInterval(() => {
     console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive - current state: ${currentState ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
 
-console.log("Meeting/webcam monitor started. Polling every", MEETING_POLL_INTERVAL_MS  / 1000, "seconds...\n");
+console.log(`Polling frequency: meeting ${MEETING_POLL_INTERVAL_MS / 1000}s, camera ${CAMERA_POLL_INTERVAL_MS / 1000}s\nMeeting/webcam monitor started...\n`);
 schedulePoll();
