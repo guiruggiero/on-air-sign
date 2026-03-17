@@ -34,7 +34,6 @@ function getCurrentSSID() {
             `powershell -NoProfile -Command "(netsh wlan show interfaces) | Select-String '(?<!\\w)SSID\\s' | Select-Object -First 1"`,
             {timeout: 5000}
         ).toString().trim();
-        // console.log("getCurrentSSID:", result.split(":").slice(1).join(":").trim());
         return result.split(":").slice(1).join(":").trim(); // Result looks like "  SSID  : MyNetwork"
 
     } catch (e) {
@@ -67,7 +66,6 @@ function isCameraInUse() {
             `powershell -NoProfile -EncodedCommand ${encoded}`,
             {timeout: 5000}
         ).toString().trim();
-        // console.log("isCameraInUse:", parseInt(result) > 0);
         return parseInt(result) > 0;
     
     } catch (e) {
@@ -96,7 +94,6 @@ function isInMeeting() {
             `powershell -NoProfile -EncodedCommand ${encoded}`,
             {timeout: 8000}
         ).toString().trim();
-        // console.log("isInMeeting:", result === "true");
         return result === "true";
     
     } catch (e) {
@@ -126,16 +123,20 @@ function callPico(endpoint, label) {
 // Monitor meeting and camera status
 function poll() {
     const inMeeting = isInMeeting();
+    // console.log("isInMeeting:", inMeeting);
 
     // Not in meeting, do nothing
     if (!inMeeting) return;
 
     // In meeting, check if at home
     const ssid = getCurrentSSID();
+    // console.log("currentSSID:", ssid);
     if (ssid !== HOME_SSID) return; // Not at home, do nothing
 
-    const newState = isCameraInUse() ? STATES.RED : STATES.YELLOW;
-    if (newState !== currentState) {
+    const cameraInUse = isCameraInUse();
+    // console.log("isCameraInUse:", cameraInUse);
+    const newState = cameraInUse ? STATES.RED : STATES.YELLOW;
+    if (newState !== currentState) { // State changed, so change colors
         currentState = newState;
         callPico(STATE_ACTIONS[newState].endpoint, STATE_ACTIONS[newState].label);
     }
