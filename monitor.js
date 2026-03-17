@@ -62,8 +62,9 @@ function isCameraInUse() {
         $count
     `;
     try {
+        const encoded = Buffer.from(psCommand, "utf16le").toString("base64");
         const result = execSync(
-            `powershell -NoProfile -Command "${psCommand}"`,
+            `powershell -NoProfile -EncodedCommand ${encoded}`,
             {timeout: 5000}
         ).toString().trim();
         // console.log("isCameraInUse:", parseInt(result) > 0);
@@ -90,8 +91,9 @@ function isInMeeting() {
         if ($found) { "true" } else { "false" }
     `;
     try {
+        const encoded = Buffer.from(psCommand, "utf16le").toString("base64");
         const result = execSync(
-            `powershell -NoProfile -Command "${psCommand}"`,
+            `powershell -NoProfile -EncodedCommand ${encoded}`,
             {timeout: 8000}
         ).toString().trim();
         // console.log("isInMeeting:", result === "true");
