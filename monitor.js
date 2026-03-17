@@ -31,7 +31,7 @@ if (!PICO_IP || PICO_IP === "<IP>") {
 function getCurrentSSID() {
     try {
         const result = execSync(
-            `powershell -NoProfile -Command "(netsh wlan show interfaces) | Select-String '(?<!\w)SSID\s' | Select-Object -First 1"`
+            `powershell -NoProfile -Command "(netsh wlan show interfaces) | Select-String '(?<!\\w)SSID\\s' | Select-Object -First 1"`,
             {timeout: 5000}
         ).toString().trim();
         // console.log("getCurrentSSID:", result.split(":").slice(1).join(":").trim());
@@ -123,28 +123,19 @@ function callPico(endpoint, label) {
 
 // Monitor meeting and camera status
 function poll() {
-    // Turn off and don't update if not at home
-    const ssid = getCurrentSSID();
-    if (ssid !== HOME_SSID) {
-        if (currentState !== STATES.OFF) {
-            currentState = STATES.OFF;
-            callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
-        }
-        return;
-    }
-
     const inMeeting = isInMeeting();
-    const camOn = inMeeting && isCameraInUse(); // No need to check cam if not in a meeting
 
-    let newState;
-    if (!inMeeting) newState = STATES.OFF;
-    else if (camOn) newState = STATES.RED;
-    else newState = STATES.YELLOW;
+    // Not in meeting, do nothing
+    if (!inMeeting) return;
 
+    // In meeting, check if at home
+    const ssid = getCurrentSSID();
+    if (ssid !== HOME_SSID) return; // Not at home, do nothing
+
+    const newState = isCameraInUse() ? STATES.RED : STATES.YELLOW;
     if (newState !== currentState) {
         currentState = newState;
-        const action = STATE_ACTIONS[newState];
-        if (action) callPico(action.endpoint, action.label);
+        callPico(STATE_ACTIONS[newState].endpoint, STATE_ACTIONS[newState].label);
     }
 }
 
