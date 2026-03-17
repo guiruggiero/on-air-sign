@@ -86,35 +86,36 @@ function isInMeeting() {
             [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
             [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
             public static List<string> GetWindowTitles() {
-            var titles = new List<string>();
-            EnumWindows((hWnd, lParam) => {
-                if (IsWindowVisible(hWnd)) {
-                var sb = new StringBuilder(256);
-                GetWindowText(hWnd, sb, 256);
-                if (sb.Length > 0) titles.Add(sb.ToString());
-                }
-                return true;
-            }, IntPtr.Zero);
-            return titles;
+                var titles = new List<string>();
+                EnumWindows((hWnd, lParam) => {
+                    if (IsWindowVisible(hWnd)) {
+                        var sb = new StringBuilder(256);
+                        GetWindowText(hWnd, sb, 256);
+                        if (sb.Length > 0) titles.Add(sb.ToString());
+                    }
+                    return true;
+                }, IntPtr.Zero);
+                return titles;
             }
         }
     "@
         $titles = [WinAPI]::GetWindowTitles()
         $meetingPatterns = @(
-        'Zoom Meeting',
-        'Huddle',
-        'Amazon Chime',
-        'Meet -',
-        'Meet –'
+            'Zoom Meeting',
+            'Huddle',
+            'Amazon Chime',
+            'Meet -',
+            'Meet –'
         )
         $found = $false
         foreach ($title in $titles) {
-        foreach ($pattern in $meetingPatterns) {
-            if ($title -like "*$pattern*") { $found = $true; break }
+            foreach ($pattern in $meetingPatterns) {
+                if ($title -like "*$pattern*") { $found = $true; break }
+            }
+            if ($found) { break }
         }
-        if ($found) { break }
-        }
-        if ($found) { "true" } else { "false" }
+        if ($found) { "true" }
+        else { "false" }
     `;
     try {
         const result = execSync(
