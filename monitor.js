@@ -13,6 +13,7 @@ const PICO_IP = process.env.PICO_IP;
 const HOME_SSID = process.env.HOME_SSID;
 const POLL_INTERVAL_MS = 5000; // 5 seconds
 let currentState = null;
+let isAtHome = false;
 const STATES = {
     OFF: "off",
     YELLOW: "yellow",
@@ -108,7 +109,7 @@ function isInMeeting() {
     }
 }
 
-// Change colors of LEDs
+// Change sign color
 function callPico(endpoint, label) {
     const options = {
         hostname: PICO_IP,
@@ -131,19 +132,24 @@ function poll() {
     const inMeeting = isInMeeting();
     // console.log("isInMeeting:", inMeeting);
 
-    // Not in meeting, do nothing
+    // Not in a meeting
     if (!inMeeting) {
-        if (currentState !== STATES.OFF && currentState !== null) { // State changed, turn off
+        if (currentState !== STATES.OFF && currentState !== null) { // Left a meeting
             currentState = STATES.OFF;
+            isAtHome = false;
             callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
+            // console.log(STATE_ACTIONS[STATES.OFF].label);
         }
         return;
     }
 
-    // In a meeting, check if at home
-    const ssid = getCurrentSSID();
-    // console.log("currentSSID:", ssid);
-    if (ssid !== HOME_SSID) return; // Not at home, do nothing
+    // First poll of a new meeting, check if at home
+    if (currentState === STATES.OFF || currentState === null) {
+        isAtHome = getCurrentSSID() === HOME_SSID;
+        // console.log("isAtHome:", isAtHome);
+    }
+
+    if (!isAtHome) return; // Not at home, do nothing
 
     const cameraInUse = isCameraInUse();
     // console.log("isCameraInUse:", cameraInUse);
@@ -151,6 +157,7 @@ function poll() {
     if (newState !== currentState) { // State changed, change colors
         currentState = newState;
         callPico(STATE_ACTIONS[newState].endpoint, STATE_ACTIONS[newState].label);
+        // console.log(STATE_ACTIONS[newState].label);
     }
 }
 
@@ -162,7 +169,7 @@ function schedulePoll() {
 
 // Graceful shutdown
 function shutdown() {
-    console.log("\nShutting down — turning sign off...");
+    console.log("\nShutting down - turning off sign...");
     callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
     setTimeout(() => process.exit(0), 1500); // Give the HTTP request time to fire
 }
@@ -171,8 +178,8 @@ process.on("SIGTERM", shutdown);
 
 // Heartbeat - TODO: where to store it?
 setInterval(() => {
-    console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive — current state: ${currentState ?? "none"}`);
+    console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive - current state: ${currentState ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
 
-console.log("Webcam/meeting monitor started. Polling every", POLL_INTERVAL_MS / 1000, "seconds...");
+console.log("Meeting/webcam monitor started. Polling every", POLL_INTERVAL_MS / 1000, "seconds...\n");
 schedulePoll();
