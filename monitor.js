@@ -126,9 +126,15 @@ function poll() {
     // console.log("isInMeeting:", inMeeting);
 
     // Not in meeting, do nothing
-    if (!inMeeting) return;
+    if (!inMeeting) {
+        if (currentState !== STATES.OFF && currentState !== null) { // State changed, turn off
+            currentState = STATES.OFF;
+            callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
+        }
+        return;
+    }
 
-    // In meeting, check if at home
+    // In a meeting, check if at home
     const ssid = getCurrentSSID();
     // console.log("currentSSID:", ssid);
     if (ssid !== HOME_SSID) return; // Not at home, do nothing
@@ -136,7 +142,7 @@ function poll() {
     const cameraInUse = isCameraInUse();
     // console.log("isCameraInUse:", cameraInUse);
     const newState = cameraInUse ? STATES.RED : STATES.YELLOW;
-    if (newState !== currentState) { // State changed, so change colors
+    if (newState !== currentState) { // State changed, change colors
         currentState = newState;
         callPico(STATE_ACTIONS[newState].endpoint, STATE_ACTIONS[newState].label);
     }
