@@ -82,10 +82,18 @@ function isCameraInUse() {
     }
 }
 
-// Get if any meeting app is in an active call
-function isInMeeting() {
+// Get status of the workstation (locked or in meeting)
+function getWorkstationStatus() {
     const psCommand = `
         $ProgressPreference = 'SilentlyContinue'
+
+        # Check if locked
+        if (Get-Process -Name LogonUI -ErrorAction SilentlyContinue) {
+            "locked"
+            exit
+        }
+
+        # Check for meeting windows
         $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
         $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime:', 'Meet -', 'Meet –', 'Microsoft Teams')
         $found = $false
@@ -95,7 +103,7 @@ function isInMeeting() {
             }
             if ($found) { break }
         }
-        if ($found) { "true" } else { "false" }
+        if ($found) { "meeting" } else { "none" }
     `;
     try {
         const encoded = Buffer.from(psCommand, "utf16le").toString("base64");
@@ -103,11 +111,11 @@ function isInMeeting() {
             `pwsh -NoProfile -EncodedCommand ${encoded}`,
             {timeout: 8000}
         ).toString().trim();
-        return result === "true";
+        return result;
     
     } catch (e) {
-        console.error(`Error checking for meeting: ${e.message}`);
-        return false; // Assume not in a meeting
+        console.error(`Error checking workstation status: ${e.message}`);
+        return "none";
     }
 }
 
@@ -143,8 +151,24 @@ function pollCamera() {
 
 // Monitor meeting status
 function poll() {
-    const inMeeting = isInMeeting();
-    // console.log("isInMeeting:", inMeeting);
+    const status = getWorkstationStatus();
+    // console.log("workstation status:", status);
+
+    // If locked, turn off sign and stop all polling for this cycle
+    if (status === "locked") {
+        if (currentState !== STATES.OFF && currentState !== null) {
+            currentState = STATES.OFF;
+            isAtHome = false;
+            if (cameraPollInterval) {
+                clearInterval(cameraPollInterval);
+                cameraPollInterval = null;
+            }
+            callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
+        }
+        return;
+    }
+
+    const inMeeting = status === "meeting";
 
     // Not in a meeting
     if (!inMeeting) {
