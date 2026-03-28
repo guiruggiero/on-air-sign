@@ -21,24 +21,15 @@ RESPONSES = {
     "/red": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED",
 }
 NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
-HTML = b"""\
-    HTTP/1.0 200 OK
-    Content-Type: text/html
-
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>On Air Sign</title>
-    </head>
-    <body>
-        <h1>On Air Sign</h1>
-        <button onclick="fetch('/red')">Red</button>
-        <button onclick="fetch('/yellow')">Yellow</button>
-        <button onclick="fetch('/off')">Off</button>
-        </body>
-    </html>
-    """ # TODO: colored buttons (update also control.html)
+HTML = (
+    b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n"
+    b"<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">"
+    b"<title>On Air Sign</title></head><body><h1>On Air Sign</h1>"
+    b"<button onclick=\"fetch('/red')\">Red</button> "
+    b"<button onclick=\"fetch('/yellow')\">Yellow</button> "
+    b"<button onclick=\"fetch('/off')\">Off</button>"
+    b"</body></html>"
+) # TODO: colored buttons (update also control.html)
 
 # Colors (R, G, B)
 OFF = (0, 0, 0)
@@ -144,17 +135,20 @@ while True:
         except IndexError:
             path = ""
 
-        # Send HTTP response
-        response = RESPONSES.get(path, NOT_FOUND)
-
+        # Handle request
         if path == "/":
-            conn.send(HTML) # TODO: test, conn.send(HTML.encode())
+            response = HTML
         elif path == "/off":
             set_sign(OFF)
+            response = RESPONSES["/off"]
         elif path == "/yellow":
             set_sign(YELLOW)
+            response = RESPONSES["/yellow"]
         elif path == "/red":
             set_sign(RED)
+            response = RESPONSES["/red"]
+        else:
+            response = NOT_FOUND
 
         conn.send(response)
     
