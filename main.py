@@ -42,6 +42,7 @@ HTML = (
 OFF = (0, 0, 0)
 YELLOW = (204, 153, 0)
 RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
 @rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
@@ -87,18 +88,25 @@ def connect_wifi():
     if not wlan.isconnected():
         wlan.connect(SSID, PASSWORD)
         print("Connecting to WiFi", end="")
+        on = False
         for _ in range(40):  # 20s timeout
             if wlan.isconnected():
                 break
+            on = not on
+            set_sign(GREEN if on else OFF) # Blink green while connecting
             print(".", end="")
             time.sleep(0.5)
         else:
+            set_sign(OFF)
             print("\nWiFi connection failed, resetting...")
             import machine
             machine.reset()
     
+    set_sign(GREEN) # Solid green when connected
     ip = wlan.ifconfig()[0]
     print(f"\nConnected! IP: {ip}")
+    time.sleep(3)
+    set_sign(OFF)
     return ip
 
 # Main
