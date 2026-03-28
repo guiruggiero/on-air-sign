@@ -1,6 +1,6 @@
 # 🚦 On-Air sign
 
-An automated "On-Air" sign using a Raspberry Pi Pico 2 W and a Node.js monitoring script to show your meeting and webcam status:
+An automated "On Air" sign using a Raspberry Pi Pico 2 W and a Node.js monitoring script to show your meeting and webcam status:
 - No meeting window detected → OFF ⚫
 - Meeting window detected, camera off → YELLOW 🟡
 - Meeting window detected, camera on → RED 🔴
@@ -8,11 +8,27 @@ An automated "On-Air" sign using a Raspberry Pi Pico 2 W and a Node.js monitorin
 ### ✨ Features
 
 - **Automatic status detection:** Automatically detects active meetings and webcam usage on your computer
-- **Multi-app support:** Works with popular meeting applications Zoom, Google Meet, Slack Huddle, and Amazon Chime
+- **Multi-app support:** Works with popular apps like Zoom, Google Meet, Slack, Amazon Chime, and Microsoft Teams
 - **Clear visual indicator:** Uses a three-state LED system: OFF, In meeting/cam off (yellow), and In meeting/cam on (red)
 - **WiFi-aware:** The monitoring script only runs when you're connected to your specified home WiFi
-- **Low-cost hardware:** Built with an affordable Raspberry Pi Pico 2 W and a WS2812 (NeoPixel) LED strip
-- **Lightweight monitoring:** Uses a simple Node.js script with PowerShell commands for efficient status checking on Windows
+- **Low-cost hardware:** Built with a Raspberry Pi Pico 2 W and a WS2812 (NeoPixel) LED strip
+- **Lightweight monitoring:** Uses a Node.js script with PowerShell 7 for efficient status checking on Windows
+
+### 🚀 Quick start
+
+1.  **Hardware:** Connect your NeoPixel data line to **GP4** on the Pico 2 W.
+2.  **Pico setup:** 
+    - Create a `secrets.py` on the Pico with `SSID = "<wifi_name>"` and `PASSWORD = "<wifi_password>"`
+    - Upload `main.py` with Thonny and run it
+    - Note the IP address printed to the serial console
+3.  **Host setup (Windows):** Run the monitor:
+    ```powershell
+    # Set env variables with user scope:
+    [System.Environment]::SetEnvironmentVariable("PICO_IP", "<ip_address>", "User")
+    [System.Environment]::SetEnvironmentVariable("HOME_SSID", "<network_name>", "User")
+    # Run:
+    node C:\path\to\on-air-sign\monitor.js
+    ```
 
 ### 🏗️ Architecture
 
