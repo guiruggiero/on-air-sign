@@ -15,24 +15,32 @@ BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
 RESPONSES = {
-    "/off": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF",
-    "/yellow": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW",
-    "/red": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED",
+    "/off": b"HTTP/1.0 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\n\r\nOFF",
+    "/yellow": b"HTTP/1.0 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\n\r\nYELLOW",
+    "/red": b"HTTP/1.0 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\n\r\nRED",
 }
-NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
+NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\n\r\nNot Found"
 HTML = (
-    b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n"
+    b"HTTP/1.0 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/html\r\n\r\n"
     b"<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">"
-    b"<title>On Air Sign</title></head><body><h1>On Air Sign</h1>"
-    b"<button onclick=\"fetch('/red')\">Red</button> "
-    b"<button onclick=\"fetch('/yellow')\">Yellow</button> "
-    b"<button onclick=\"fetch('/off')\">Off</button>"
+    b"<title>On Air sign control</title>"
+    b"<style>button{padding:10px 20px;color:#fff;border:none;border-radius:5px;cursor:pointer;margin:5px;font-size:16px}"
+    b"#msg{margin-top:10px;font-size:16px;opacity:0;transition:opacity .3s}</style>"
+    b"</head><body><h1>On Air sign color</h1>"
+    b"<div><button style=\"background:#333\" onclick=\"send('/off')\">Off</button> "
+    b"<button style=\"background:#c90\" onclick=\"send('/yellow')\">Yellow</button> "
+    b"<button style=\"background:#c00\" onclick=\"send('/red')\">Red</button></div>"
+    b"<div id=\"msg\"></div>"
+    b"<script>function send(p){fetch(p).then(r=>r.text()).then(t=>{let m=document.getElementById('msg');"
+    b"m.textContent='\\u2705 Set to '+t;m.style.opacity=1;setTimeout(()=>m.style.opacity=0,2000)}"
+    b".catch(()=>{let m=document.getElementById('msg');m.textContent='\\u274c Request failed';"
+    b"m.style.opacity=1;setTimeout(()=>m.style.opacity=0,2000)})}</script>"
     b"</body></html>"
-) # TODO: colored buttons (update also control.html)
+) # TODO: test
 
 # Colors (R, G, B)
 OFF = (0, 0, 0)
-YELLOW = (255, 150, 0)
+YELLOW = (204, 153, 0)
 RED = (255, 0, 0)
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
@@ -180,7 +188,7 @@ while True:
             print(f"Server error: {e}")
 
     except Exception as e:
-        print(f"Server error: {e}") # TODO: Sentry?
+        print(f"Server error: {e}") # TODO: some logging?
     
     finally:
         if conn:

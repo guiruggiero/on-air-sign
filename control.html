@@ -1,13 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>On Air sign</title>
-</head>
-<body>
-  <h1>On Air sign</h1>
-  <button onclick="fetch('http://192.168.0.209/off')">⚫ Off</button>
-  <button onclick="fetch('http://192.168.0.209/yellow')">🟡 Yellow</button>
-  <button onclick="fetch('http://192.168.0.209/red')">🔴 Red</button>
-</body>
+  <head>
+    <meta charset="UTF-8">
+
+    <title>On Air sign control</title>
+
+    <style>
+      button{padding:10px 20px;color:#fff;border:none;border-radius:5px;cursor:pointer;margin:5px;font-size:16px}
+      #msg{margin-top:10px;font-size:16px;opacity:0;transition:opacity .3s}
+    </style>
+  </head>
+
+  <body>
+    <h1>On Air sign color</h1>
+
+    <div>
+      <button style="background:#333" onclick="send('/off')">Off</button>
+      <button style="background:#c90" onclick="send('/yellow')">Yellow</button>
+      <button style="background:#c00" onclick="send('/red')">Red</button>
+    </div>
+
+    <div id="msg"></div>
+
+    <script>
+      function send(p) {
+        fetch('http://192.168.0.209' + p)
+
+          .then(r => r.text())
+
+          .then(t => {
+            let m = document.getElementById('msg');
+            m.textContent = '\u2705 Set to ' + t;
+            m.style.opacity = 1;
+            setTimeout(() => m.style.opacity = 0, 2000);
+          })
+
+          .catch(() => {
+            let m = document.getElementById('msg');
+            m.textContent = '\u274c Request failed';
+            m.style.opacity = 1;
+            setTimeout(() => m.style.opacity = 0, 2000);
+          });
+      }
+    </script>
+  </body>
 </html>
