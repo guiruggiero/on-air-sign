@@ -79,9 +79,15 @@ def connect_wifi():
     if not wlan.isconnected():
         wlan.connect(SSID, PASSWORD)
         print("Connecting to WiFi", end="")
-        while not wlan.isconnected():
+        for _ in range(40):  # 20s timeout
+            if wlan.isconnected():
+                break
             print(".", end="")
             time.sleep(0.5)
+        else:
+            print("\nWiFi connection failed, resetting...")
+            import machine
+            machine.reset()
     
     ip = wlan.ifconfig()[0]
     print(f"\nConnected! IP: {ip}")
