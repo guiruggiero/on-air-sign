@@ -24,13 +24,10 @@
 
     <script>
       function send(p) {
-        fetch('http://192.168.0.209' + p)
-
-          .then(r => r.text())
-
-          .then(t => {
+        fetch('http://192.168.0.209' + p, {mode: 'no-cors'})
+          .then(() => {
             let m = document.getElementById('msg');
-            m.textContent = '\u2705 Set to ' + t;
+            m.textContent = '\u2705 Sent';
             m.style.opacity = 1;
             setTimeout(() => m.style.opacity = 0, 2000);
           })

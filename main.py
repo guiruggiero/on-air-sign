@@ -14,29 +14,13 @@ NUM_LEDS = 12
 BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
+WEBREPL_PW = secrets.WEBREPL_PW
 RESPONSES = {
-    "/off": b"HTTP/1.0 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\n\r\nOFF",
-    "/yellow": b"HTTP/1.0 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\n\r\nYELLOW",
-    "/red": b"HTTP/1.0 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\n\r\nRED",
+    "/off": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF",
+    "/yellow": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW",
+    "/red": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED",
 }
-NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\n\r\nNot Found"
-HTML = (
-    b"HTTP/1.0 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/html\r\n\r\n"
-    b"<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">"
-    b"<title>On Air sign control</title>"
-    b"<style>button{padding:10px 20px;color:#fff;border:none;border-radius:5px;cursor:pointer;margin:5px;font-size:16px}"
-    b"#msg{margin-top:10px;font-size:16px;opacity:0;transition:opacity .3s}</style>"
-    b"</head><body><h1>On Air sign color</h1>"
-    b"<div><button style=\"background:#333\" onclick=\"send('/off')\">Off</button> "
-    b"<button style=\"background:#c90\" onclick=\"send('/yellow')\">Yellow</button> "
-    b"<button style=\"background:#c00\" onclick=\"send('/red')\">Red</button></div>"
-    b"<div id=\"msg\"></div>"
-    b"<script>function send(p){fetch(p).then(r=>r.text()).then(t=>{let m=document.getElementById('msg');"
-    b"m.textContent='\\u2705 Set to '+t;m.style.opacity=1;setTimeout(()=>m.style.opacity=0,2000)}"
-    b".catch(()=>{let m=document.getElementById('msg');m.textContent='\\u274c Request failed';"
-    b"m.style.opacity=1;setTimeout(()=>m.style.opacity=0,2000)})}</script>"
-    b"</body></html>"
-) # TODO: test
+NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
 
 # Colors (R, G, B)
 OFF = (0, 0, 0)
@@ -45,7 +29,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
-@rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
+@rp2.asm_pio(sideset_init = rp2.PIO.OUT_LOW, out_shiftdir = rp2.PIO.SHIFT_LEFT, autopull = True, pull_thresh = 24)
 def ws2812():
     T1, T2, T3 = 2, 5, 3
     wrap_target()
@@ -58,7 +42,7 @@ def ws2812():
     wrap()
 
 # Initialize StateMachine on the data pin
-sm = rp2.StateMachine(0, ws2812, freq=8_000_000, sideset_base=Pin(DATA_PIN))
+sm = rp2.StateMachine(0, ws2812, freq = 8_000_000, sideset_base = Pin(DATA_PIN))
 sm.active(1)
 
 pixel_data = array.array("I", [0] * NUM_LEDS) # Internal buffer
@@ -87,14 +71,14 @@ def connect_wifi():
     wlan.active(True)
     if not wlan.isconnected():
         wlan.connect(SSID, PASSWORD)
-        print("Connecting to WiFi", end="")
+        print("Connecting to WiFi", end = "")
         on = False
         for _ in range(40):  # 20s timeout
             if wlan.isconnected():
                 break
             on = not on
             set_sign(GREEN if on else OFF) # Blink green while connecting
-            print(".", end="")
+            print(".", end = "")
             time.sleep(0.5)
         else:
             set_sign(OFF)
@@ -113,14 +97,8 @@ def connect_wifi():
 ip = connect_wifi()
 set_sign(OFF)
 try:
-    mdns = network.mDNS()
-    mdns.hostname("onairsign") # Manual control on http://onairsign.local, TODO: test
-    mdns.start()
-except:
-    print("mDNS not available")
-try:
     import webrepl
-    webrepl.start() # Script update via WiFi on http://micropython.org/webrepl, TODO: test
+    webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266
 except:
     print("WebREPL not available")
 
@@ -173,9 +151,7 @@ while True:
             path = ""
 
         # Handle request
-        if path == "/":
-            response = HTML
-        elif path == "/off":
+        if path == "/off":
             set_sign(OFF)
             response = RESPONSES["/off"]
         elif path == "/yellow":
