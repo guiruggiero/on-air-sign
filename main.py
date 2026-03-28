@@ -5,13 +5,14 @@ from machine import Pin
 import array
 import time
 import network
+import webrepl
 import socket
 import gc
 
 # Initializations
 DATA_PIN = 4
 NUM_LEDS = 12
-BRIGHTNESS = 0.3  # 0.0 (off) to 1.0 (full brightness)
+BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
 RESPONSES = {
@@ -20,6 +21,24 @@ RESPONSES = {
     "/red": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED",
 }
 NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
+HTML = b"""\
+    HTTP/1.0 200 OK
+    Content-Type: text/html
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>On Air Sign</title>
+    </head>
+    <body>
+        <h1>On Air Sign</h1>
+        <button onclick="fetch('/red')">Red</button>
+        <button onclick="fetch('/yellow')">Yellow</button>
+        <button onclick="fetch('/off')">Off</button>
+        </body>
+    </html>
+    """ # TODO: colored buttons (update also control.html)
 
 # Colors (R, G, B)
 OFF = (0, 0, 0)
@@ -81,6 +100,10 @@ def connect_wifi():
 # Main
 ip = connect_wifi()
 set_sign(OFF)
+mdns = network.mDNS()
+mdns.hostname("onairsign") # Manual control on http://onairsign.local, TODO: test
+mdns.start()
+webrepl.start() # Script update via wi-fi on http://micropython.org/webrepl, TODO: test
 
 # Start server
 addr = socket.getaddrinfo("0.0.0.0", 80)[0][-1]
@@ -124,7 +147,9 @@ while True:
         # Send HTTP response
         response = RESPONSES.get(path, NOT_FOUND)
 
-        if path == "/off":
+        if path == "/":
+            conn.send(HTML) # TODO: test, conn.send(HTML.encode())
+        elif path == "/off":
             set_sign(OFF)
         elif path == "/yellow":
             set_sign(YELLOW)
