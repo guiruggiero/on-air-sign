@@ -97,12 +97,20 @@ mdns.start()
 webrepl.start() # Script update via wi-fi on http://micropython.org/webrepl, TODO: test
 
 # Start server
-addr = socket.getaddrinfo("0.0.0.0", 80)[0][-1]
-s = socket.socket()
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind(addr)
-s.listen(5)
-s.settimeout(5.0)
+def start_server():
+    global s
+    try:
+        s.close()
+    except:
+        pass
+    s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(socket.getaddrinfo("0.0.0.0", 80)[0][-1])
+    s.listen(5)
+    s.settimeout(5.0)
+
+s = None
+start_server()
 print(f"Listening on http://{ip}")
 
 while True: 
@@ -114,6 +122,7 @@ while True:
         if not wlan.isconnected():
             print("WiFi lost, reconnecting...")
             connect_wifi()
+            start_server()
 
         conn, client_addr = s.accept()
         conn.settimeout(3.0) # Prevent hanging on unresponsive clients
