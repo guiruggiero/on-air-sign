@@ -5,7 +5,6 @@ from machine import Pin
 import array
 import time
 import network
-import webrepl
 import socket
 import gc
 
@@ -94,7 +93,11 @@ set_sign(OFF)
 mdns = network.mDNS()
 mdns.hostname("onairsign") # Manual control on http://onairsign.local, TODO: test
 mdns.start()
-webrepl.start() # Script update via wi-fi on http://micropython.org/webrepl, TODO: test
+try:
+    import webrepl
+    webrepl.start() # Script update via WiFi on http://micropython.org/webrepl, TODO: test
+except:
+    print("WebREPL not available")
 
 # Start server
 def start_server():
