@@ -90,9 +90,12 @@ def connect_wifi():
 # Main
 ip = connect_wifi()
 set_sign(OFF)
-mdns = network.mDNS()
-mdns.hostname("onairsign") # Manual control on http://onairsign.local, TODO: test
-mdns.start()
+try:
+    mdns = network.mDNS()
+    mdns.hostname("onairsign") # Manual control on http://onairsign.local, TODO: test
+    mdns.start()
+except:
+    print("mDNS not available")
 try:
     import webrepl
     webrepl.start() # Script update via WiFi on http://micropython.org/webrepl, TODO: test
