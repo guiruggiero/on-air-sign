@@ -1,9 +1,3 @@
-// Run with
-//     $env:PICO_IP="<ip_address>"; $env:HOME_SSID="<network_name>"; node .\monitor.js
-// or set env variables with user scope with
-//     [System.Environment]::SetEnvironmentVariable("PICO_IP", "<ip_address>", "User")
-//     [System.Environment]::SetEnvironmentVariable("HOME_SSID", "<network_name>", "User")
-
 // Imports
 import {execSync} from "child_process";
 import http from "http";
@@ -134,7 +128,9 @@ function pollCamera() {
     const cameraInUse = isCameraInUse();
     // console.log("isCameraInUse:", cameraInUse);
     const newState = cameraInUse ? STATES.RED : STATES.YELLOW;
-    if (newState !== currentState) { // State changed, change colors
+    
+    // State changed, change colors
+    if (newState !== currentState) {
         currentState = newState;
         callPico(STATE_ACTIONS[newState].endpoint, STATE_ACTIONS[newState].label);
         // console.log(STATE_ACTIONS[newState].label);
@@ -161,7 +157,7 @@ function poll() {
         return;
     }
 
-    // First poll of a new meeting, check if at home and spin up camera polling
+    // First poll of a new meeting
     if (currentState === STATES.OFF || currentState === null) {
         isAtHome = getCurrentSSID() === HOME_SSID;
         // console.log("isAtHome:", isAtHome);
@@ -174,7 +170,7 @@ function poll() {
     if (!isAtHome) return; // Not at home, do nothing
 }
 
-// Chain polls so the next only starts after the current one finishes
+// Chain polls - next only starts only after current one finishes
 function schedulePoll() {
     poll();
     setTimeout(schedulePoll, MEETING_POLL_INTERVAL_MS);
