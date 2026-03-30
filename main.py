@@ -1,7 +1,7 @@
 # Imports
 import secrets
 import rp2
-from machine import Pin
+import machine
 import array
 import time
 import network
@@ -15,18 +15,28 @@ BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
 WEBREPL_PW = secrets.WEBREPL_PW
-RESPONSES = {
-    "/off": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF",
-    "/yellow": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW",
-    "/red": b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED",
-}
-NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
 
 # Colors (R, G, B)
 OFF = (0, 0, 0)
 YELLOW = (204, 153, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
+
+# GRB values (brightness-adjusted, GRB byte order for WS2812)
+def _to_grb(r, g, b):
+    return (int(g * BRIGHTNESS) << 16) | (int(r * BRIGHTNESS) << 8) | int(b * BRIGHTNESS)
+GRB_OFF    = _to_grb(*OFF)
+GRB_YELLOW = _to_grb(*YELLOW)
+GRB_RED    = _to_grb(*RED)
+GRB_GREEN  = _to_grb(*GREEN)
+
+# Route map: path -> (GRB color, response bytes)
+ROUTES = {
+    "/off":    (GRB_OFF,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF"),
+    "/yellow": (GRB_YELLOW, b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW"),
+    "/red":    (GRB_RED,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED"),
+}
+NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
 @rp2.asm_pio(sideset_init = rp2.PIO.OUT_LOW, out_shiftdir = rp2.PIO.SHIFT_LEFT, autopull = True, pull_thresh = 24)
@@ -42,27 +52,16 @@ def ws2812():
     wrap()
 
 # Initialize StateMachine on the data pin
-sm = rp2.StateMachine(0, ws2812, freq = 8_000_000, sideset_base = Pin(DATA_PIN))
+sm = rp2.StateMachine(0, ws2812, freq = 8_000_000, sideset_base = machine.Pin(DATA_PIN))
 sm.active(1)
 
 pixel_data = array.array("I", [0] * NUM_LEDS) # Internal buffer
 
 # Change color of LEDs
-def set_sign(color):
-    r, g, b = color
-    
-    # Apply brightness
-    r = int(r * BRIGHTNESS)
-    g = int(g * BRIGHTNESS)
-    b = int(b * BRIGHTNESS)
-    
-    grb = (g << 16) | (r << 8) | b # Converts to GRB order (expected by WS2812)
-    
+def set_sign(grb):
     for i in range(NUM_LEDS):
         pixel_data[i] = grb
-    
     sm.put(pixel_data, 8) # Send to PIO
-
     time.sleep_ms(10) # Brief settle time to ensure the PIO FIFO buffer is cleared
 
 # Connect to WiFi
@@ -77,29 +76,27 @@ def connect_wifi():
             if wlan.isconnected():
                 break
             on = not on
-            set_sign(GREEN if on else OFF) # Blink green while connecting
+            set_sign(GRB_GREEN if on else GRB_OFF) # Blink green while connecting
             print(".", end = "")
             time.sleep(0.5)
         else:
-            set_sign(OFF)
+            set_sign(GRB_OFF)
             print("\nWiFi connection failed, resetting...")
-            import machine
             machine.reset()
-    
-    set_sign(GREEN) # Solid green when connected
+
+    set_sign(GRB_GREEN) # Solid green when connected
     ip = wlan.ifconfig()[0]
     print(f"\nConnected! IP: {ip}")
     time.sleep(3)
-    set_sign(OFF)
+    set_sign(GRB_OFF)
     return ip
 
 # Main
 ip = connect_wifi()
-set_sign(OFF)
 try:
     import webrepl
     webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266, TODO: test
-except:
+except Exception:
     print("WebREPL not available")
 
 # Start server
@@ -107,7 +104,7 @@ def start_server():
     global s
     try:
         s.close()
-    except:
+    except Exception:
         pass
     s = socket.socket()
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -119,9 +116,9 @@ s = None
 start_server()
 print(f"Listening on http://{ip}")
 
-while True: 
+while True:
     gc.collect() # Periodically clean up memory
-    
+
     conn = None
     try:
         # Check WiFi status and reconnect if needed
@@ -130,7 +127,7 @@ while True:
             connect_wifi()
             start_server()
 
-        conn, client_addr = s.accept()
+        conn, _ = s.accept()
         conn.settimeout(3.0) # Prevent hanging on unresponsive clients
 
         raw_request = conn.recv(256) # Get first line
@@ -143,28 +140,19 @@ while True:
             continue # Skip malformed binary requests
 
         # Extract path from HTTP request
-        try:
-            first_line = request.split("\r\n")[0]  # e.g. "GET /yellow HTTP/1.1"
-            parts = first_line.split(" ")
-            path = parts[1] if len(parts) >= 2 else ""
-        except IndexError:
-            path = ""
+        first_line = request.split("\r\n")[0]  # e.g. "GET /yellow HTTP/1.1"
+        parts = first_line.split(" ")
+        path = parts[1] if len(parts) >= 2 else ""
 
         # Handle request
-        if path == "/off":
-            set_sign(OFF)
-            response = RESPONSES["/off"]
-        elif path == "/yellow":
-            set_sign(YELLOW)
-            response = RESPONSES["/yellow"]
-        elif path == "/red":
-            set_sign(RED)
-            response = RESPONSES["/red"]
+        if path in ROUTES:
+            grb, response = ROUTES[path]
+            set_sign(grb)
         else:
             response = NOT_FOUND
 
         conn.send(response)
-    
+
     except OSError as e:
         if e.args[0] == 110: # ETIMEDOUT, no client connected, loop back
             pass
@@ -173,7 +161,7 @@ while True:
 
     except Exception as e:
         print(f"Server error: {e}") # TODO: some logging?
-    
+
     finally:
         if conn:
             conn.close()
