@@ -98,7 +98,7 @@ ip = connect_wifi()
 set_sign(OFF)
 try:
     import webrepl
-    webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266
+    webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266, TODO: test
 except:
     print("WebREPL not available")
 
