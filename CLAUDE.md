@@ -35,7 +35,7 @@ Two completely separate components that communicate over HTTP on the local netwo
 - Uses a 5-second socket accept timeout to keep the main loop non-blocking
 
 ### `monitor.js` — Node.js on Windows host
-- No npm dependencies; uses only Node.js built-ins (`child_process`, `http`)
+- No npm dependencies; uses only Node.js built-ins (`child_process`, `http`); requires PowerShell 7+ (`pwsh`)
 - Polls for active meeting windows every 15s by running a PowerShell command that checks process window titles
 - When a meeting starts, checks home WiFi SSID (via `netsh`) once — if not home, does nothing
 - If at home, starts polling webcam status every 4s via Windows Registry (`CapabilityAccessManager`)
@@ -53,5 +53,4 @@ Two completely separate components that communicate over HTTP on the local netwo
 ## Key files
 - `main.py` — entire Pico firmware (single file, MicroPython)
 - `monitor.js` — entire host monitor (single file, Node.js ES Modules)
-- `neopixel_ring.py` — reference/example code from the Raspberry Pi foundation, not deployed
 - `secrets.py` — gitignored, lives only on the Pico

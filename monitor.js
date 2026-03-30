@@ -11,14 +11,9 @@ let cameraPollInterval = null;
 let currentState = null;
 let isAtHome = false;
 const STATES = {
-    OFF: "off",
-    YELLOW: "yellow",
-    RED: "red",
-};
-const STATE_ACTIONS = {
-    [STATES.OFF]: {endpoint: "/off", label: "OFF ⚫"},
-    [STATES.YELLOW]: {endpoint: "/yellow", label: "YELLOW 🟡"},
-    [STATES.RED]: {endpoint: "/red", label: "RED 🔴"},
+    OFF:    {endpoint: "/off",    label: "OFF ⚫"},
+    YELLOW: {endpoint: "/yellow", label: "YELLOW 🟡"},
+    RED:    {endpoint: "/red",    label: "RED 🔴"},
 };
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -27,6 +22,44 @@ if (!PICO_IP || !HOME_SSID) {
     console.error("Environment variables not set. Terminating");
     process.exit(1);
 }
+
+// Run a base64-encoded PowerShell script
+function runPS(encoded, timeout) {
+    return execSync(`pwsh -NoProfile -EncodedCommand ${encoded}`, {timeout}).toString().trim();
+}
+
+// Encoded PowerShell scripts
+const CAMERA_PS = Buffer.from(`
+    $ProgressPreference = 'SilentlyContinue'
+    $paths = @(
+        'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam',
+        'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam\\NonPackaged'
+    )
+    $count = 0
+    foreach ($path in $paths) {
+        if (Test-Path $path) {
+            $count += (Get-ChildItem $path |
+                ForEach-Object { Get-ItemProperty $_.PsPath } |
+                Where-Object { $_.LastUsedTimeStop -eq 0 } |
+                Measure-Object).Count
+        }
+    }
+    $count
+`, "utf16le").toString("base64");
+
+const MEETING_PS = Buffer.from(`
+    $ProgressPreference = 'SilentlyContinue'
+    $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
+    $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime:', 'Meet -', 'Meet \u2013', 'Microsoft Teams')
+    $found = $false
+    foreach ($title in $titles) {
+        foreach ($pattern in $meetingPatterns) {
+            if ($title -like "*$pattern*") { $found = $true; break }
+        }
+        if ($found) { break }
+    }
+    if ($found) { "true" } else { "false" }
+`, "utf16le").toString("base64");
 
 // Get the current WiFi name
 function getCurrentSSID() {
@@ -45,31 +78,8 @@ function getCurrentSSID() {
 
 // Get if webcam is in use
 function isCameraInUse() {
-    const psCommand = `
-        $ProgressPreference = 'SilentlyContinue'
-        $paths = @(
-            'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam',
-            'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam\\NonPackaged'
-        )
-        $count = 0
-        foreach ($path in $paths) {
-            if (Test-Path $path) {
-                $count += (Get-ChildItem $path |
-                    ForEach-Object { Get-ItemProperty $_.PsPath } |
-                    Where-Object { $_.LastUsedTimeStop -eq 0 } |
-                    Measure-Object).Count
-            }
-        }
-        $count
-    `;
     try {
-        const encoded = Buffer.from(psCommand, "utf16le").toString("base64");
-        const result = execSync(
-            `pwsh -NoProfile -EncodedCommand ${encoded}`,
-            {timeout: 5000}
-        ).toString().trim();
-        return parseInt(result) > 0;
-    
+        return parseInt(runPS(CAMERA_PS, 5000)) > 0;
     } catch (e) {
         console.error(`Error checking camera status: ${e.message}`);
         return false; // Assume camera is off
@@ -78,27 +88,8 @@ function isCameraInUse() {
 
 // Get if any meeting app is in an active call
 function isInMeeting() {
-    const psCommand = `
-        $ProgressPreference = 'SilentlyContinue'
-        $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
-        $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime:', 'Meet -', 'Meet –', 'Microsoft Teams')
-        $found = $false
-        foreach ($title in $titles) {
-            foreach ($pattern in $meetingPatterns) {
-                if ($title -like "*$pattern*") { $found = $true; break }
-            }
-            if ($found) { break }
-        }
-        if ($found) { "true" } else { "false" }
-    `;
     try {
-        const encoded = Buffer.from(psCommand, "utf16le").toString("base64");
-        const result = execSync(
-            `pwsh -NoProfile -EncodedCommand ${encoded}`,
-            {timeout: 8000}
-        ).toString().trim();
-        return result === "true";
-    
+        return runPS(MEETING_PS, 8000) === "true";
     } catch (e) {
         console.error(`Error checking for meeting: ${e.message}`);
         return false; // Assume not in a meeting
@@ -106,20 +97,18 @@ function isInMeeting() {
 }
 
 // Change sign color
-function callPico(endpoint, label) {
-    const options = {
-        hostname: PICO_IP,
-        port: 80,
-        path: endpoint,
-        method: "GET",
-    };
-    const req = http.request(options, (res) => {
+function callPico(state, onError) {
+    const {endpoint, label} = state;
+    const req = http.request({hostname: PICO_IP, port: 80, path: endpoint, method: "GET"}, (res) => {
         console.log(`[${new Date().toLocaleTimeString()}] Sign → ${label} (HTTP ${res.statusCode})`);
     });
     req.setTimeout(3000, () => {
         req.destroy(new Error("Request timed out"));
     });
-    req.on("error", (e) => console.error("Pico unreachable:", e.message));
+    req.on("error", (e) => {
+        console.error("Pico unreachable:", e.message);
+        if (onError) onError();
+    });
     req.end();
 }
 
@@ -128,12 +117,13 @@ function pollCamera() {
     const cameraInUse = isCameraInUse();
     // console.log("isCameraInUse:", cameraInUse);
     const newState = cameraInUse ? STATES.RED : STATES.YELLOW;
-    
+
     // State changed, change colors
     if (newState !== currentState) {
+        const prevState = currentState;
         currentState = newState;
-        callPico(STATE_ACTIONS[newState].endpoint, STATE_ACTIONS[newState].label);
-        // console.log(STATE_ACTIONS[newState].label);
+        callPico(newState, () => {currentState = prevState;});
+        // console.log(newState.label);
     }
 }
 
@@ -145,14 +135,15 @@ function poll() {
     // Not in a meeting
     if (!inMeeting) {
         if (currentState !== STATES.OFF && currentState !== null) { // Left a meeting
+            const prevState = currentState;
             currentState = STATES.OFF;
             isAtHome = false;
             if (cameraPollInterval) {
                 clearInterval(cameraPollInterval);
                 cameraPollInterval = null;
             }
-            callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
-            // console.log(STATE_ACTIONS[STATES.OFF].label);
+            callPico(STATES.OFF, () => {currentState = prevState;});
+            // console.log(STATES.OFF.label);
         }
         return;
     }
@@ -170,7 +161,7 @@ function poll() {
     if (!isAtHome) return; // Not at home, do nothing
 }
 
-// Chain polls - next only starts only after current one finishes
+// Chain polls - next only starts after current one finishes
 function schedulePoll() {
     poll();
     setTimeout(schedulePoll, MEETING_POLL_INTERVAL_MS);
@@ -179,7 +170,11 @@ function schedulePoll() {
 // Graceful shutdown
 function shutdown() {
     console.log("\nShutting down - turning off sign...");
-    callPico(STATE_ACTIONS[STATES.OFF].endpoint, STATE_ACTIONS[STATES.OFF].label);
+    if (cameraPollInterval) {
+        clearInterval(cameraPollInterval);
+        cameraPollInterval = null;
+    }
+    callPico(STATES.OFF);
     setTimeout(() => process.exit(0), 1500); // Give the HTTP request time to fire
 }
 process.on("SIGINT", shutdown);
@@ -187,7 +182,7 @@ process.on("SIGTERM", shutdown);
 
 // Heartbeat
 setInterval(() => {
-    console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive - current state: ${currentState ?? "none"}`);
+    console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive - current state: ${currentState?.label ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
 
 console.log(`Polling frequency: meeting ${MEETING_POLL_INTERVAL_MS / 1000}s, camera ${CAMERA_POLL_INTERVAL_MS / 1000}s\nMeeting/webcam monitor started...\n`);
