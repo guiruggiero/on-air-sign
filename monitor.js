@@ -5,11 +5,9 @@ import http from "http";
 // Initializations
 const PICO_IP = process.env.PICO_IP;
 const HOME_SSID = process.env.HOME_SSID;
-const MEETING_POLL_INTERVAL_MS = 15000; // 15 seconds
-const CAMERA_POLL_INTERVAL_MS = 4000; // 4 seconds
-let cameraPollInterval = null;
+const IDLE_POLL_INTERVAL_MS = 15000; // 15 seconds when no meeting
+const ACTIVE_POLL_INTERVAL_MS = 5000; // 5 seconds during a meeting (camera responsiveness)
 let currentState = null;
-let isAtHome = false;
 const STATES = {
     OFF:    {endpoint: "/off",    label: "OFF ⚫"},
     YELLOW: {endpoint: "/yellow", label: "YELLOW 🟡"},
@@ -28,9 +26,28 @@ function runPS(encoded, timeout) {
     return execSync(`pwsh -NoProfile -EncodedCommand ${encoded}`, {timeout}).toString().trim();
 }
 
-// Encoded PowerShell scripts
-const CAMERA_PS = Buffer.from(`
+// Combined PowerShell script: checks meeting, SSID, and camera in one process spawn
+// Returns "false||false" if not in a meeting, or "true|<ssid>|<cameraInUse>" if in a meeting
+const POLL_PS = Buffer.from(`
     $ProgressPreference = 'SilentlyContinue'
+
+    # Check meeting
+    $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
+    $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime:', 'Meet -', 'Meet \u2013', 'Microsoft Teams')
+    $inMeeting = $false
+    foreach ($title in $titles) {
+        foreach ($pattern in $meetingPatterns) {
+            if ($title -like "*$pattern*") { $inMeeting = $true; break }
+        }
+        if ($inMeeting) { break }
+    }
+    if (-not $inMeeting) { "false||false"; exit }
+
+    # Check SSID
+    $ssidLine = (netsh wlan show interfaces) | Select-String '(?<!\w)SSID\s' | Select-Object -First 1
+    $ssid = if ($ssidLine) { ($ssidLine -split ':', 2)[1].Trim() } else { '' }
+
+    # Check camera
     $paths = @(
         'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam',
         'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam\\NonPackaged'
@@ -44,57 +61,10 @@ const CAMERA_PS = Buffer.from(`
                 Measure-Object).Count
         }
     }
-    $count
+    $cameraInUse = if ($count -gt 0) { 'true' } else { 'false' }
+
+    "true|$ssid|$cameraInUse"
 `, "utf16le").toString("base64");
-
-const MEETING_PS = Buffer.from(`
-    $ProgressPreference = 'SilentlyContinue'
-    $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
-    $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime:', 'Meet -', 'Meet \u2013', 'Microsoft Teams')
-    $found = $false
-    foreach ($title in $titles) {
-        foreach ($pattern in $meetingPatterns) {
-            if ($title -like "*$pattern*") { $found = $true; break }
-        }
-        if ($found) { break }
-    }
-    if ($found) { "true" } else { "false" }
-`, "utf16le").toString("base64");
-
-// Get the current WiFi name
-function getCurrentSSID() {
-    try {
-        const result = execSync(
-            `pwsh -NoProfile -Command "(netsh wlan show interfaces) | Select-String '(?<!\\w)SSID\\s' | Select-Object -First 1"`,
-            {timeout: 5000}
-        ).toString().trim();
-        return result.split(":").slice(1).join(":").trim(); // Result looks like "  SSID  : MyNetwork"
-
-    } catch (e) {
-        console.error(`Error getting SSID: ${e.message}`);
-        return null; // Assume not on the home network
-    }
-}
-
-// Get if webcam is in use
-function isCameraInUse() {
-    try {
-        return parseInt(runPS(CAMERA_PS, 5000)) > 0;
-    } catch (e) {
-        console.error(`Error checking camera status: ${e.message}`);
-        return false; // Assume camera is off
-    }
-}
-
-// Get if any meeting app is in an active call
-function isInMeeting() {
-    try {
-        return runPS(MEETING_PS, 8000) === "true";
-    } catch (e) {
-        console.error(`Error checking for meeting: ${e.message}`);
-        return false; // Assume not in a meeting
-    }
-}
 
 // Change sign color
 function callPico(state, onError) {
@@ -112,68 +82,49 @@ function callPico(state, onError) {
     req.end();
 }
 
-// Monitor camera status
-function pollCamera() {
-    const cameraInUse = isCameraInUse();
-    // console.log("isCameraInUse:", cameraInUse);
-    const newState = cameraInUse ? STATES.RED : STATES.YELLOW;
-
-    // State changed, change colors
-    if (newState !== currentState) {
-        const prevState = currentState;
-        currentState = newState;
-        callPico(newState, () => {currentState = prevState;});
-        // console.log(newState.label);
-    }
-}
-
-// Monitor meeting status
+// Poll meeting, SSID, and camera status in one PowerShell call
 function poll() {
-    const inMeeting = isInMeeting();
-    // console.log("isInMeeting:", inMeeting);
+    let inMeeting, ssid, cameraInUse;
+    try {
+        [inMeeting, ssid, cameraInUse] = runPS(POLL_PS, 10000).split("|");
+    } catch (e) {
+        console.error(`Error polling status: ${e.message}`);
+        return;
+    }
 
     // Not in a meeting
-    if (!inMeeting) {
+    if (inMeeting !== "true") {
         if (currentState !== STATES.OFF && currentState !== null) { // Left a meeting
             const prevState = currentState;
             currentState = STATES.OFF;
-            isAtHome = false;
-            if (cameraPollInterval) {
-                clearInterval(cameraPollInterval);
-                cameraPollInterval = null;
-            }
             callPico(STATES.OFF, () => {currentState = prevState;});
-            // console.log(STATES.OFF.label);
         }
         return;
     }
 
-    // First poll of a new meeting
-    if (currentState === STATES.OFF || currentState === null) {
-        isAtHome = getCurrentSSID() === HOME_SSID;
-        // console.log("isAtHome:", isAtHome);
-        if (isAtHome && !cameraPollInterval) {
-            pollCamera(); // Immediate first camera check
-            cameraPollInterval = setInterval(pollCamera, CAMERA_POLL_INTERVAL_MS);
-        }
-    }
+    if (ssid !== HOME_SSID) return; // Not at home, do nothing
 
-    if (!isAtHome) return; // Not at home, do nothing
+    // In a meeting at home — set state based on camera
+    const newState = cameraInUse === "true" ? STATES.RED : STATES.YELLOW;
+    if (newState !== currentState) {
+        const prevState = currentState;
+        currentState = newState;
+        callPico(newState, () => { currentState = prevState; });
+    }
 }
 
 // Chain polls - next only starts after current one finishes
 function schedulePoll() {
     poll();
-    setTimeout(schedulePoll, MEETING_POLL_INTERVAL_MS);
+    const interval = currentState !== STATES.OFF && currentState !== null
+        ? ACTIVE_POLL_INTERVAL_MS
+        : IDLE_POLL_INTERVAL_MS;
+    setTimeout(schedulePoll, interval); // Schedules itself to run again 
 }
 
 // Graceful shutdown
 function shutdown() {
     console.log("\nShutting down - turning off sign...");
-    if (cameraPollInterval) {
-        clearInterval(cameraPollInterval);
-        cameraPollInterval = null;
-    }
     callPico(STATES.OFF);
     setTimeout(() => process.exit(0), 1500); // Give the HTTP request time to fire
 }
@@ -185,5 +136,5 @@ setInterval(() => {
     console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive - current state: ${currentState?.label ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
 
-console.log(`Polling frequency: meeting ${MEETING_POLL_INTERVAL_MS / 1000}s, camera ${CAMERA_POLL_INTERVAL_MS / 1000}s\nMeeting/webcam monitor started...\n`);
+console.log(`Poll interval: idle ${IDLE_POLL_INTERVAL_MS / 1000}s, active ${ACTIVE_POLL_INTERVAL_MS / 1000}s\nMeeting/webcam monitor started...\n`);
 schedulePoll();
