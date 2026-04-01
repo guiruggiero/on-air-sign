@@ -1,5 +1,6 @@
 // Imports
 import {execSync} from "child_process";
+import {readFileSync} from "fs";
 import http from "http";
 
 // Initializations
@@ -26,45 +27,9 @@ function runPS(encoded, timeout) {
     return execSync(`pwsh -NoProfile -EncodedCommand ${encoded}`, {timeout}).toString().trim();
 }
 
-// Combined PowerShell script: checks meeting, SSID, and camera in one process spawn
+// Load PowerShell script from file and base64-encode for -EncodedCommand
 // Returns "false||false" if not in a meeting, or "true|<ssid>|<cameraInUse>" if in a meeting
-const POLL_PS = Buffer.from(`
-    $ProgressPreference = 'SilentlyContinue'
-
-    # Check meeting
-    $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
-    $meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime:', 'Meet -', 'Meet \u2013', 'Microsoft Teams')
-    $inMeeting = $false
-    foreach ($title in $titles) {
-        foreach ($pattern in $meetingPatterns) {
-            if ($title -like "*$pattern*") { $inMeeting = $true; break }
-        }
-        if ($inMeeting) { break }
-    }
-    if (-not $inMeeting) { "false||false"; exit }
-
-    # Check SSID
-    $ssidLine = (netsh wlan show interfaces) | Select-String '(?<!\w)SSID\s' | Select-Object -First 1
-    $ssid = if ($ssidLine) { ($ssidLine -split ':', 2)[1].Trim() } else { '' }
-
-    # Check camera
-    $paths = @(
-        'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam',
-        'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam\\NonPackaged'
-    )
-    $count = 0
-    foreach ($path in $paths) {
-        if (Test-Path $path) {
-            $count += (Get-ChildItem $path |
-                ForEach-Object { Get-ItemProperty $_.PsPath } |
-                Where-Object { $_.LastUsedTimeStop -eq 0 } |
-                Measure-Object).Count
-        }
-    }
-    $cameraInUse = if ($count -gt 0) { 'true' } else { 'false' }
-
-    "true|$ssid|$cameraInUse"
-`, "utf16le").toString("base64");
+const POLL_PS = Buffer.from(readFileSync(new URL("poll.ps1", import.meta.url), "utf-8"), "utf16le").toString("base64");
 
 // Change sign color
 function callPico(state, onError) {
