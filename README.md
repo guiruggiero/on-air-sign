@@ -18,7 +18,7 @@ An automated "On Air" sign using a Raspberry Pi Pico 2 W and a Node.js monitorin
 
 There are two main components:
 
-#### Raspberry Pi Pico 2 W (`main.py`)
+#### Raspberry Pi Pico 2 W (`pico/`)
 - A MicroPython script — no external libraries required
 - NeoPixel data line on **GP4**, controlled via Pico's PIO state machine
 - Connects to WiFi and runs an HTTP server with endpoints for LED control (`/off`, `/yellow`, `/red`) and a web dashboard (`/`)
@@ -26,7 +26,7 @@ There are two main components:
 - Requires a `secrets.py` on the Pico with `SSID`, `PASSWORD`, and `WEBREPL_PW`
 - Upload `main.py`, `mdns.py`, and `dashboard.html` with Thonny
 
-#### Host monitor script (`monitor.js`)
+#### Host monitor script (`host/`)
 - A Node.js script for Windows — no npm packages required, uses PowerShell 7 (`pwsh`)
 - Periodically checks for active meeting windows by title and webcam usage via the Windows Registry
 - Only sends commands when connected to the configured home WiFi (SSID)
