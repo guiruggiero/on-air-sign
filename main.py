@@ -15,6 +15,7 @@ BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
 WEBREPL_PW = secrets.WEBREPL_PW
+current_state = "OFF"
 
 # Colors (R, G, B)
 OFF = (0, 0, 0)
@@ -30,13 +31,31 @@ GRB_YELLOW = _to_grb(*YELLOW)
 GRB_RED    = _to_grb(*RED)
 GRB_GREEN  = _to_grb(*GREEN)
 
-# Route map: path -> (GRB color, response bytes)
+# Route map: path -> (GRB color, response bytes, state name)
 ROUTES = {
-    "/off":    (GRB_OFF,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF"),
-    "/yellow": (GRB_YELLOW, b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW"),
-    "/red":    (GRB_RED,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED"),
+    "/off":    (GRB_OFF,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF",    "OFF"),
+    "/yellow": (GRB_YELLOW, b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW", "YELLOW"),
+    "/red":    (GRB_RED,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED",    "RED"),
 }
 NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
+INDEX_PAGE = b"""HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>On Air sign control</title><style>
+body{font-family:sans-serif;text-align:center;margin:2em}
+button{font-size:1.4em;padding:.6em 1.2em;margin:.3em;border:none;border-radius:8px;cursor:pointer}
+#s{font-size:1.6em;margin:1em}
+#msg{margin-top:10px;font-size:1em;opacity:0;transition:opacity .3s}
+</style></head><body>
+<h2>On Air sign color</h2><div id="s">...</div>
+<button onclick="send('/off')" style="background:#ccc">OFF</button>
+<button onclick="send('/yellow')" style="background:#cc0">YELLOW</button>
+<button onclick="send('/red')" style="background:#e33;color:#fff">RED</button>
+<div id="msg"></div>
+<script>
+function flash(t){var m=document.getElementById('msg');m.innerHTML=t;m.style.opacity=1;setTimeout(function(){m.style.opacity=0},2000)}
+function send(p){fetch(p).then(function(r){return r.text()}).then(function(t){document.getElementById('s').textContent=t;flash('&#x2714; Sent')}).catch(function(){flash('&#x2718; Failed')})}
+fetch('/status').then(function(r){return r.text()}).then(function(t){document.getElementById('s').textContent=t})
+</script></body></html>"""
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
 @rp2.asm_pio(sideset_init = rp2.PIO.OUT_LOW, out_shiftdir = rp2.PIO.SHIFT_LEFT, autopull = True, pull_thresh = 24)
@@ -130,7 +149,7 @@ while True:
         conn, _ = s.accept()
         conn.settimeout(3.0) # Prevent hanging on unresponsive clients
 
-        raw_request = conn.recv(256) # Get first line
+        raw_request = conn.recv(512) # Get first line
         if not raw_request:
             continue
 
@@ -146,12 +165,15 @@ while True:
 
         # Handle request
         if path in ROUTES:
-            grb, response = ROUTES[path]
+            grb, response, current_state = ROUTES[path]
             set_sign(grb)
+            conn.send(response)
+        elif path == "/status":
+            conn.send(b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n" + current_state.encode())
+        elif path == "/":
+            conn.send(INDEX_PAGE)
         else:
-            response = NOT_FOUND
-
-        conn.send(response)
+            conn.send(NOT_FOUND)
 
     except OSError as e:
         if e.args[0] == 110: # ETIMEDOUT, no client connected, loop back
