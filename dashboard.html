@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+
+        <title>On Air sign control</title>
+
+        <style>
+            body {
+                font-family: sans-serif;
+                text-align: center;
+                margin: 2em
+            }
+
+            button {
+                font-size: 1.4em;
+                padding: .6em 1.2em;
+                margin: .3em;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer
+            }
+
+            #msg {
+                margin-top: 10px;
+                font-size: 1em;
+                opacity: 0;
+                transition: opacity .3s
+            }
+        </style>
+    </head>
+
+    <body>
+        <h2>On Air sign color</h2>
+
+        <button onclick="send('/off')" style="background:#CCCCCC">OFF</button>
+        <button onclick="send('/yellow')" style="background:#CC9900">YELLOW</button>
+        <button onclick="send('/red')" style="background:#FF0000;color:#FFFFFF">RED</button>
+
+        <div id="msg"></div>
+
+        <script>
+            var base = location.protocol === 'file:' ? 'http://192.168.0.209' : '';
+
+            function flash(t) {
+                var m = document.getElementById('msg');
+                m.innerHTML = t;
+                m.style.opacity = 1;
+                setTimeout(function () {m.style.opacity = 0}, 2000)
+            }
+
+            function send(p) {
+                fetch(base + p, base ? {mode: 'no-cors'} : {})
+                .then(function () {flash('&#x2714; Sent')})
+                .catch(function () {flash('&#x2718; Failed')})
+            }
+        </script>
+    </body>
+</html>
