@@ -28,8 +28,7 @@ There are two main components:
 
 #### Host monitor script (`host/`)
 - A Node.js script for Windows — no npm packages required, uses PowerShell 7 (`pwsh`)
-- Periodically checks for active meeting windows by title and webcam usage via the Windows Registry
-- Only sends commands when connected to the configured home WiFi (SSID)
+- Periodically runs a PowerShell script (`poll.ps1`) that checks lock state, WiFi SSID, active meeting windows by title, and webcam usage via the Windows Registry
 - Sends HTTP GET requests to the Pico to update LED color on state changes
 - Requires `PICO_IP` and `HOME_SSID` environment variables
 

@@ -27,9 +27,8 @@ function runPS(encoded, timeout) {
     return execSync(`pwsh -NoProfile -EncodedCommand ${encoded}`, {timeout}).toString().trim();
 }
 
-// Load PowerShell script from file and base64-encode for -EncodedCommand
-// Returns "false||false" if not in a meeting, or "true|<ssid>|<cameraInUse>" if in a meeting
-const POLL_PS = Buffer.from(readFileSync(new URL("poll.ps1", import.meta.url), "utf-8"), "utf16le").toString("base64");
+// Load PowerShell script with HOME_SSID, returns "false|false" if not in a meeting, or "true|<cameraInUse>" if in a meeting at home
+const POLL_PS = Buffer.from(`$HomeSSID = '${HOME_SSID}'\n` + readFileSync(new URL("poll.ps1", import.meta.url), "utf-8"), "utf16le").toString("base64");
 
 // Change sign color
 function callPico(state, onError) {
@@ -47,17 +46,17 @@ function callPico(state, onError) {
     req.end();
 }
 
-// Poll meeting, SSID, and camera status in one PowerShell call
+// Poll meeting and camera status in one PowerShell call
 function poll() {
-    let inMeeting, ssid, cameraInUse;
+    let inMeeting, cameraInUse;
     try {
-        [inMeeting, ssid, cameraInUse] = runPS(POLL_PS, 10000).split("|");
+        [inMeeting, cameraInUse] = runPS(POLL_PS, 10000).split("|");
     } catch (e) {
         console.error(`Error polling status: ${e.message}`);
         return;
     }
 
-    // Not in a meeting
+    // Not in a meeting (or computer locked, or not at home)
     if (inMeeting !== "true") {
         if (currentState !== STATES.OFF && currentState !== null) { // Left a meeting
             const prevState = currentState;
@@ -66,8 +65,6 @@ function poll() {
         }
         return;
     }
-
-    if (ssid !== HOME_SSID) return; // Not at home, do nothing
 
     // In a meeting at home — set state based on camera
     const newState = cameraInUse === "true" ? STATES.RED : STATES.YELLOW;

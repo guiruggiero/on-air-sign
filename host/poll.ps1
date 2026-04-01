@@ -1,8 +1,16 @@
-$ProgressPreference = 'SilentlyContinue'
+$ProgressPreference = "SilentlyContinue"
+
+# Check computer lock (meeting shorthand)
+if (Get-Process -Name LogonUI -ErrorAction SilentlyContinue) { "false|false"; exit }
+
+# Check WiFi SSID
+$ssidLine = (netsh wlan show interfaces) | Select-String "(?<!\w)SSID\s" | Select-Object -First 1
+$ssid = if ($ssidLine) { ($ssidLine -split ":", 2)[1].Trim() } else { "" }
+if ($ssid -ne $HomeSSID) { "false|false"; exit }
 
 # Check meeting
-$titles = Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty MainWindowTitle
-$meetingPatterns = @('Zoom Meeting', 'Huddle', 'Amazon Chime:', 'Meet -', 'Meet –', 'Microsoft Teams')
+$titles = Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object -ExpandProperty MainWindowTitle
+$meetingPatterns = @("Zoom Meeting", "Huddle", "Amazon Chime:", "Meet -", "Meet –", "Microsoft Teams")
 $inMeeting = $false
 foreach ($title in $titles) {
     foreach ($pattern in $meetingPatterns) {
@@ -10,16 +18,12 @@ foreach ($title in $titles) {
     }
     if ($inMeeting) { break }
 }
-if (-not $inMeeting) { "false||false"; exit }
-
-# Check SSID
-$ssidLine = (netsh wlan show interfaces) | Select-String '(?<!\w)SSID\s' | Select-Object -First 1
-$ssid = if ($ssidLine) { ($ssidLine -split ':', 2)[1].Trim() } else { '' }
+if (-not $inMeeting) { "false|false"; exit }
 
 # Check camera
 $paths = @(
-    'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam',
-    'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam\NonPackaged'
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam",
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam\NonPackaged"
 )
 $count = 0
 foreach ($path in $paths) {
@@ -30,6 +34,5 @@ foreach ($path in $paths) {
             Measure-Object).Count
     }
 }
-$cameraInUse = if ($count -gt 0) { 'true' } else { 'false' }
-
-"true|$ssid|$cameraInUse"
+$cameraInUse = if ($count -gt 0) { "true" } else { "false" }
+"true|$cameraInUse"
