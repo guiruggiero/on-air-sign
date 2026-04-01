@@ -15,47 +15,24 @@ BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
 WEBREPL_PW = secrets.WEBREPL_PW
-current_state = "OFF"
-
-# Colors (R, G, B)
-OFF = (0, 0, 0)
-YELLOW = (204, 153, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
 
 # GRB values (brightness-adjusted, GRB byte order for WS2812)
 def _to_grb(r, g, b):
     return (int(g * BRIGHTNESS) << 16) | (int(r * BRIGHTNESS) << 8) | int(b * BRIGHTNESS)
-GRB_OFF    = _to_grb(*OFF)
-GRB_YELLOW = _to_grb(*YELLOW)
-GRB_RED    = _to_grb(*RED)
-GRB_GREEN  = _to_grb(*GREEN)
+GRB_OFF    = _to_grb(0, 0, 0)
+GRB_YELLOW = _to_grb(204, 153, 0)
+GRB_RED    = _to_grb(255, 0, 0)
+GRB_GREEN  = _to_grb(0, 255, 0)
 
-# Route map: path -> (GRB color, response bytes, state name)
+# Route map: path -> (GRB color, response bytes)
 ROUTES = {
-    "/off":    (GRB_OFF,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF",    "OFF"),
-    "/yellow": (GRB_YELLOW, b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW", "YELLOW"),
-    "/red":    (GRB_RED,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED",    "RED"),
+    "/off":    (GRB_OFF,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF"),
+    "/yellow": (GRB_YELLOW, b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW"),
+    "/red":    (GRB_RED,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED"),
 }
 NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
-INDEX_PAGE = b"""HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE html>
-<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>On Air sign control</title><style>
-body{font-family:sans-serif;text-align:center;margin:2em}
-button{font-size:1.4em;padding:.6em 1.2em;margin:.3em;border:none;border-radius:8px;cursor:pointer}
-#s{font-size:1.6em;margin:1em}
-#msg{margin-top:10px;font-size:1em;opacity:0;transition:opacity .3s}
-</style></head><body>
-<h2>On Air sign color</h2><div id="s">...</div>
-<button onclick="send('/off')" style="background:#ccc">OFF</button>
-<button onclick="send('/yellow')" style="background:#cc0">YELLOW</button>
-<button onclick="send('/red')" style="background:#e33;color:#fff">RED</button>
-<div id="msg"></div>
-<script>
-function flash(t){var m=document.getElementById('msg');m.innerHTML=t;m.style.opacity=1;setTimeout(function(){m.style.opacity=0},2000)}
-function send(p){fetch(p).then(function(r){return r.text()}).then(function(t){document.getElementById('s').textContent=t;flash('&#x2714; Sent')}).catch(function(){flash('&#x2718; Failed')})}
-fetch('/status').then(function(r){return r.text()}).then(function(t){document.getElementById('s').textContent=t})
-</script></body></html>"""
+with open("dashboard.html", "r") as f:
+    INDEX_PAGE = b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n" + f.read().encode()
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
 @rp2.asm_pio(sideset_init = rp2.PIO.OUT_LOW, out_shiftdir = rp2.PIO.SHIFT_LEFT, autopull = True, pull_thresh = 24)
@@ -109,9 +86,14 @@ def connect_wifi():
     time.sleep(3)
     set_sign(GRB_OFF)
     return ip
-
-# Main
 ip = connect_wifi()
+
+# mDNS responder for http://onairsign.local
+from mdns import MDNSResponder
+mdns = MDNSResponder("onairsign", ip)
+mdns.start()
+
+# WebREPL for updating files over WiFi
 try:
     import webrepl
     webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266, TODO: test
@@ -130,13 +112,13 @@ def start_server():
     s.bind(socket.getaddrinfo("0.0.0.0", 80)[0][-1])
     s.listen(5)
     s.settimeout(5.0)
-
 s = None
 start_server()
 print(f"Listening on http://{ip}")
 
 while True:
     gc.collect() # Periodically clean up memory
+    mdns.process() # Handle mDNS queries
 
     conn = None
     try:
@@ -159,17 +141,15 @@ while True:
             continue # Skip malformed binary requests
 
         # Extract path from HTTP request
-        first_line = request.split("\r\n")[0]  # e.g. "GET /yellow HTTP/1.1"
+        first_line = request.split("\r\n", 1)[0]  # e.g., "GET /yellow HTTP/1.1"
         parts = first_line.split(" ")
         path = parts[1] if len(parts) >= 2 else ""
 
         # Handle request
         if path in ROUTES:
-            grb, response, current_state = ROUTES[path]
+            grb, response = ROUTES[path]
             set_sign(grb)
             conn.send(response)
-        elif path == "/status":
-            conn.send(b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n" + current_state.encode())
         elif path == "/":
             conn.send(INDEX_PAGE)
         else:
