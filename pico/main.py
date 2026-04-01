@@ -115,10 +115,16 @@ def start_server():
 s = None
 start_server()
 print(f"Listening on http://{ip}")
+last_command_time = time.ticks_ms()
 
 while True:
     gc.collect() # Periodically clean up memory
     mdns.process() # Handle mDNS queries
+
+    # Watchdog: turn off sign if monitor stopped sending commands
+    if pixel_data[0] != GRB_OFF and time.ticks_diff(time.ticks_ms(), last_command_time) > 300_000: # 5m timeout
+        print("No command received in 5 minutes, turning off sign")
+        set_sign(GRB_OFF)
 
     conn = None
     try:
@@ -149,6 +155,7 @@ while True:
         if path in ROUTES:
             grb, response = ROUTES[path]
             set_sign(grb)
+            last_command_time = time.ticks_ms()
             conn.send(response)
         elif path == "/":
             conn.send(INDEX_PAGE)
@@ -160,6 +167,7 @@ while True:
             pass
         else:
             print(f"Server error: {e}")
+            start_server() # Recover from socket corruption
 
     except Exception as e:
         print(f"Server error: {e}") # TODO: some logging?

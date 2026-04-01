@@ -34,13 +34,14 @@ Two completely separate components that communicate over HTTP on the local netwo
 - On boot: blinks green while connecting to WiFi, shows solid green for 3s when connected, then turns off
 - Auto-reconnects and restarts server if WiFi is lost; resets the Pico if initial connection fails after 20s
 - Uses a 5-second socket accept timeout to keep the main loop non-blocking
+- Watchdog: turns off the sign if no command is received within 5 minutes (covers monitor crash, PC sleep, etc.)
 
 ### `host/monitor.js` — Node.js on Windows host
 - No npm dependencies; uses only Node.js built-ins (`child_process`, `http`); requires PowerShell 7+ (`pwsh`)
 - Polls for active meeting windows every 15s by running a PowerShell command that checks process window titles
 - When a meeting starts, checks home WiFi SSID (via `netsh`) once — if not home, does nothing
 - If at home, starts polling webcam status every 4s via Windows Registry (`CapabilityAccessManager`)
-- Sends HTTP GET to Pico only on state changes (avoids redundant requests)
+- Sends HTTP GET to Pico on state changes and as heartbeat during active meetings (feeds Pico watchdog)
 - Meeting poll uses chained `setTimeout` (not `setInterval`) so polls don't overlap
 - `SIGINT`/`SIGTERM` turns the sign off before exiting
 

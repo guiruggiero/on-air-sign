@@ -110,6 +110,8 @@ function poll() {
         const prevState = currentState;
         currentState = newState;
         callPico(newState, () => { currentState = prevState; });
+    } else {
+        callPico(newState); // Heartbeat for Pico watchdog
     }
 }
 
