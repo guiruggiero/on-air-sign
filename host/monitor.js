@@ -1,7 +1,42 @@
 // Imports
+import {dirname, join} from "path";
+import {fileURLToPath} from "url";
+import {statSync, readFileSync, writeFileSync, appendFileSync} from "fs";
 import {execSync} from "child_process";
-import {readFileSync} from "fs";
 import http from "http";
+
+// Logging
+const HOST_DIR = dirname(fileURLToPath(import.meta.url));
+const LOG_PATH = join(HOST_DIR, "logs.log");
+const ERR_PATH = join(HOST_DIR, "errors.log");
+const LOG_MAX_BYTES = 200_000;
+
+function trimLog(path) {
+    try {
+        const size = statSync(path).size;
+        if (size > LOG_MAX_BYTES) {
+            const content = readFileSync(path, "utf-8");
+            writeFileSync(path, content.slice(content.length / 2));
+        }
+    } catch {}
+}
+
+function log(msg) {
+    const line = `[${new Date().toLocaleTimeString()} ${Intl.DateTimeFormat().resolvedOptions().timeZone}] ${msg}`;
+    console.log(line);
+    try {
+        trimLog(LOG_PATH);
+        appendFileSync(LOG_PATH, line + "\n");
+    } catch {}
+}
+
+function logError(msg) {
+    log(msg);
+    try {
+        trimLog(ERR_PATH);
+        appendFileSync(ERR_PATH, `[${new Date().toLocaleTimeString()} ${Intl.DateTimeFormat().resolvedOptions().timeZone}] ${msg}\n`);
+    } catch {}
+}
 
 // Initializations
 const PICO_IP = process.env.PICO_IP;
@@ -18,7 +53,7 @@ const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Initial check if env variables are set
 if (!PICO_IP || !HOME_SSID) {
-    console.error("Environment variables not set. Terminating");
+    logError("Environment variables not set. Terminating");
     process.exit(1);
 }
 
@@ -34,13 +69,13 @@ const POLL_PS = Buffer.from(`$HomeSSID = '${HOME_SSID}'\n` + readFileSync(new UR
 function callPico(state, onError) {
     const {endpoint, label} = state;
     const req = http.request({hostname: PICO_IP, port: 80, path: endpoint, method: "GET"}, (res) => {
-        console.log(`[${new Date().toLocaleTimeString()}] Sign → ${label} (HTTP ${res.statusCode})`);
+        log(`Sign → ${label} (HTTP ${res.statusCode})`);
     });
     req.setTimeout(3000, () => {
         req.destroy(new Error("Request timed out"));
     });
     req.on("error", (e) => {
-        console.error("Pico unreachable:", e.message);
+        logError(`Pico unreachable: ${e.message}`);
         if (onError) onError();
     });
     req.end();
@@ -52,7 +87,7 @@ function poll() {
     try {
         [inMeeting, cameraInUse] = runPS(POLL_PS, 10000).split("|");
     } catch (e) {
-        console.error(`Error polling status: ${e.message}`);
+        logError(`Error polling status: ${e.message}`);
         return;
     }
 
@@ -88,7 +123,7 @@ function schedulePoll() {
 
 // Graceful shutdown
 function shutdown() {
-    console.log("\nShutting down - turning off sign...");
+    log("Shutting down - turning off sign...");
     callPico(STATES.OFF);
     setTimeout(() => process.exit(0), 1500); // Give the HTTP request time to fire
 }
@@ -97,8 +132,8 @@ process.on("SIGTERM", shutdown);
 
 // Heartbeat
 setInterval(() => {
-    console.log(`[${new Date().toLocaleTimeString()}] ♥ Alive - current state: ${currentState?.label ?? "none"}`);
+    log(`♥ Alive - current state: ${currentState?.label ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
 
-console.log(`Poll interval: idle ${IDLE_POLL_INTERVAL_MS / 1000}s, active ${ACTIVE_POLL_INTERVAL_MS / 1000}s\nMeeting/webcam monitor started...\n`);
+log(`Poll interval: idle ${IDLE_POLL_INTERVAL_MS / 1000}s, active ${ACTIVE_POLL_INTERVAL_MS / 1000}s\nMeeting/webcam monitor started...\n`);
 schedulePoll();

@@ -35,13 +35,15 @@ Two completely separate components that communicate over HTTP on the local netwo
 - Auto-reconnects and restarts server if WiFi is lost; resets the Pico if initial connection fails after 20s
 - Uses a 5-second socket accept timeout to keep the main loop non-blocking
 - Watchdog: turns off the sign if no command is received within 5 minutes (covers monitor crash, PC sleep, etc.)
+- Logs to `log.txt` on flash with timestamps (PST via NTP sync, UTC-8 offset); auto-trims at 50KB keeping the newest half; retrievable via WebREPL
 
 ### `host/monitor.js` — Node.js on Windows host
-- No npm dependencies; uses only Node.js built-ins (`child_process`, `fs`, `http`); requires PowerShell 7+ (`pwsh`)
+- No npm dependencies; uses only Node.js built-ins (`child_process`, `fs`, `http`, `url`, `path`); requires PowerShell 7+ (`pwsh`)
 - Injects `HOME_SSID` into `poll.ps1` at startup and base64-encodes it for `-EncodedCommand`
 - Polls by running the PowerShell script every 15s (idle) or 5s (in meeting); uses chained `setTimeout` so polls don't overlap
 - Sends HTTP GET to Pico on state changes and as heartbeat during active meetings (feeds Pico watchdog)
 - `SIGINT`/`SIGTERM` turns the sign off before exiting
+- Logs to `host/logs.log` (all events) and `host/errors.log` (errors only); timestamps include local timezone; both auto-trim at 200KB keeping the newest half
 
 ### Sign states
 | State | Meaning |

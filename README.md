@@ -24,12 +24,14 @@ There are two main components:
 - Connects to WiFi and runs an HTTP server with endpoints for LED control (`/off`, `/yellow`, `/red`) and a web dashboard (`/`)
 - Reachable at [http://onairsign.local](http://onairsign.local) via a built-in mDNS responder (`mdns.py`)
 - Requires a `secrets.py` on the Pico with `SSID`, `PASSWORD`, and `WEBREPL_PW`
+- Logs to `log.txt` on flash (PST timestamps via NTP); retrievable via WebREPL
 - Upload `main.py`, `mdns.py`, and `dashboard.html` with Thonny
 
 #### Host monitor script (`host/`)
 - A Node.js script for Windows — no npm packages required, uses PowerShell 7 (`pwsh`)
 - Periodically runs a PowerShell script (`poll.ps1`) that checks lock state, WiFi SSID, active meeting windows by title, and webcam usage via the Windows Registry
 - Sends HTTP GET requests to the Pico to update LED color on state changes
+- Logs to `host/logs.log` (all events) and `host/errors.log` (errors only); auto-trims at 200KB
 - Requires `PICO_IP` and `HOME_SSID` environment variables
 
 ---

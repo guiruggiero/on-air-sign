@@ -9,14 +9,35 @@ import socket
 import gc
 
 # Initializations
-DATA_PIN = 4
-NUM_LEDS = 12
-BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 SSID = secrets.SSID
 PASSWORD = secrets.PASSWORD
 WEBREPL_PW = secrets.WEBREPL_PW
 
+# Persistent logging to flash
+LOG_PATH = "log.txt"
+LOG_MAX_BYTES = 50_000
+def log(msg):
+    t = time.localtime(time.time() - 8 * 3600)
+    line = f"[{t[3]:02}:{t[4]:02}:{t[5]:02}] {msg}"
+    print(line)
+    try:
+        try:
+            size = __import__("os").stat(LOG_PATH)[6]
+        except OSError:
+            size = 0
+        if size > LOG_MAX_BYTES:
+            with open(LOG_PATH, "r") as f:
+                f.read(size // 2)
+                keep = f.read()
+            with open(LOG_PATH, "w") as f:
+                f.write(keep)
+        with open(LOG_PATH, "a") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
 # GRB values (brightness-adjusted, GRB byte order for WS2812)
+BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 def _to_grb(r, g, b):
     return (int(g * BRIGHTNESS) << 16) | (int(r * BRIGHTNESS) << 8) | int(b * BRIGHTNESS)
 GRB_OFF    = _to_grb(0, 0, 0)
@@ -48,9 +69,10 @@ def ws2812():
     wrap()
 
 # Initialize StateMachine on the data pin
+DATA_PIN = 4
+NUM_LEDS = 12
 sm = rp2.StateMachine(0, ws2812, freq = 8_000_000, sideset_base = machine.Pin(DATA_PIN))
 sm.active(1)
-
 pixel_data = array.array("I", [0] * NUM_LEDS) # Internal buffer
 
 # Change color of LEDs
@@ -66,23 +88,28 @@ def connect_wifi():
     wlan.active(True)
     if not wlan.isconnected():
         wlan.connect(SSID, PASSWORD)
-        print("Connecting to WiFi", end = "")
+        log("Connecting to WiFi...")
         on = False
         for _ in range(40):  # 20s timeout
             if wlan.isconnected():
                 break
             on = not on
             set_sign(GRB_GREEN if on else GRB_OFF) # Blink green while connecting
-            print(".", end = "")
             time.sleep(0.5)
         else:
             set_sign(GRB_OFF)
-            print("\nWiFi connection failed, resetting...")
+            log("WiFi connection failed, resetting...")
             machine.reset()
 
     set_sign(GRB_GREEN) # Solid green when connected
     ip = wlan.ifconfig()[0]
-    print(f"\nConnected! IP: {ip}")
+    log(f"Connected! IP: {ip}")
+    try:
+        import ntptime
+        ntptime.settime()
+        log("NTP time synced")
+    except Exception:
+        log("NTP sync failed")
     time.sleep(3)
     set_sign(GRB_OFF)
     return ip
@@ -96,9 +123,9 @@ mdns.start()
 # WebREPL for updating files over WiFi
 try:
     import webrepl
-    webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266, TODO: test
+    webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266
 except Exception:
-    print("WebREPL not available")
+    log("WebREPL not available")
 
 # Start server
 def start_server():
@@ -114,7 +141,7 @@ def start_server():
     s.settimeout(5.0)
 s = None
 start_server()
-print(f"Listening on http://{ip}")
+log(f"Listening on http://{ip}")
 last_command_time = time.ticks_ms()
 
 while True:
@@ -123,14 +150,14 @@ while True:
 
     # Watchdog: turn off sign if monitor stopped sending commands
     if pixel_data[0] != GRB_OFF and time.ticks_diff(time.ticks_ms(), last_command_time) > 300_000: # 5m timeout
-        print("No command received in 5 minutes, turning off sign")
+        log("No command received in 5 minutes, turning off sign")
         set_sign(GRB_OFF)
 
     conn = None
     try:
         # Check WiFi status and reconnect if needed
         if not wlan.isconnected():
-            print("WiFi lost, reconnecting...")
+            log("WiFi lost, reconnecting...")
             connect_wifi()
             start_server()
 
@@ -154,6 +181,7 @@ while True:
         # Handle request
         if path in ROUTES:
             grb, response = ROUTES[path]
+            log(f"Request: {path}")
             set_sign(grb)
             last_command_time = time.ticks_ms()
             conn.send(response)
@@ -166,11 +194,11 @@ while True:
         if e.args[0] == 110: # ETIMEDOUT, no client connected, loop back
             pass
         else:
-            print(f"Server error: {e}")
+            log(f"Server error: {e}")
             start_server() # Recover from socket corruption
 
     except Exception as e:
-        print(f"Server error: {e}") # TODO: some logging?
+        log(f"Server error: {e}")
 
     finally:
         if conn:
