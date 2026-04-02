@@ -1,3 +1,4 @@
+# Run directly with: pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
 $ProgressPreference = "SilentlyContinue"
 
 # Check computer lock (meeting shorthand)
