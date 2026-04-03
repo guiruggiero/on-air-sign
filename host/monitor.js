@@ -16,25 +16,30 @@ function trimLog(path) {
         const size = statSync(path).size;
         if (size > LOG_MAX_BYTES) {
             const content = readFileSync(path, "utf-8");
-            writeFileSync(path, content.slice(content.length / 2));
+            const mid = content.indexOf("\n", Math.floor(content.length / 2));
+            writeFileSync(path, mid !== -1 ? content.slice(mid + 1) : content);
         }
     } catch {}
 }
 
 function log(msg) {
-    const line = `[${new Date().toLocaleTimeString()} ${Intl.DateTimeFormat().resolvedOptions().timeZone}] ${msg}`;
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const line = `[${mm}-${dd} ${now.toLocaleTimeString()} ${Intl.DateTimeFormat().resolvedOptions().timeZone}] ${msg}`;
     console.log(line);
     try {
         trimLog(LOG_PATH);
         appendFileSync(LOG_PATH, line + "\n");
     } catch {}
+    return line;
 }
 
 function logError(msg) {
-    log(msg);
+    const line = log(msg);
     try {
         trimLog(ERR_PATH);
-        appendFileSync(ERR_PATH, `[${new Date().toLocaleTimeString()} ${Intl.DateTimeFormat().resolvedOptions().timeZone}] ${msg}\n`);
+        appendFileSync(ERR_PATH, line + "\n");
     } catch {}
 }
 
