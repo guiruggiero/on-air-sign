@@ -46,11 +46,23 @@ Two completely separate components that communicate over HTTP on the local netwo
 - Logs to `host/logs.log` (all events) and `host/errors.log` (errors only); timestamps include local timezone; both auto-trim at 200KB keeping the newest half
 
 ### Sign states
-| State | Meaning |
-|-------|---------|
-| OFF | No meeting detected |
+| State  | Meaning                    |
+|--------|----------------------------|
+| OFF    | No meeting detected        |
 | YELLOW | Meeting active, camera off |
-| RED | Meeting active, camera on |
+| RED    | Meeting active, camera on  |   
+
+## Debugging
+
+```powershell
+# Test poll.ps1 directly (bypasses monitor.js)
+pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
+```
+
+## Gotchas
+
+- **`PICO_IP` vs hostname**: Node.js's `http` module doesn't resolve `.local` mDNS names on Windows — the raw IP is required for `monitor.js` even though the browser can reach `http://onairsign.local` fine
+- **WebREPL**: Connect to the Pico remotely at `http://micropython.org/webrepl` using `ws://<PICO_IP>:8266` to retrieve `log.txt` or update files without USB
 
 ## Key files
 - `pico/main.py` — entire Pico firmware (single file, MicroPython)

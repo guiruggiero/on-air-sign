@@ -65,13 +65,16 @@ class MDNSResponder:
 
         # Extract the queried name (starts at byte 12, after the DNS header)
         qname_start = 12
-        qname_end = data.index(b"\x00", qname_start) + 1
+        try:
+            qname_end = data.index(b"\x00", qname_start) + 1
+            qtype, qclass = struct.unpack_from("!2H", data, qname_end)
+        except (ValueError, struct.error):
+            return # Malformed packet, drop it
         qname = data[qname_start:qname_end]
         if qname.lower() != self._encoded_name:
             return # Not for us
 
         # Only respond to A record (1) or ANY (255) queries
-        qtype, qclass = struct.unpack_from("!2H", data, qname_end)
         if qtype not in (1, 255):
             return
 

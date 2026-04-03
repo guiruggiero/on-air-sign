@@ -1,9 +1,10 @@
 # Imports
 import secrets
+import time
+import os
 import rp2
 import machine
 import array
-import time
 import network
 import socket
 import gc
@@ -18,16 +19,17 @@ LOG_PATH = "log.txt"
 LOG_MAX_BYTES = 50_000
 def log(msg):
     t = time.localtime(time.time() - 8 * 3600)
-    line = f"[{t[3]:02}:{t[4]:02}:{t[5]:02}] {msg}"
+    line = f"[{t[1]:02}-{t[2]:02} {t[3]:02}:{t[4]:02}:{t[5]:02}] {msg}"
     print(line)
     try:
         try:
-            size = __import__("os").stat(LOG_PATH)[6]
+            size = os.stat(LOG_PATH)[6]
         except OSError:
             size = 0
         if size > LOG_MAX_BYTES:
             with open(LOG_PATH, "r") as f:
-                f.read(size // 2)
+                f.seek(size // 2)
+                f.readline() # Discard the partial line at the seek point
                 keep = f.read()
             with open(LOG_PATH, "w") as f:
                 f.write(keep)
@@ -46,14 +48,15 @@ GRB_RED    = _to_grb(255, 0, 0)
 GRB_GREEN  = _to_grb(0, 255, 0)
 
 # Route map: path -> (GRB color, response bytes)
+CORS = b"Access-Control-Allow-Origin: *\r\n"
 ROUTES = {
-    "/off":    (GRB_OFF,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOFF"),
-    "/yellow": (GRB_YELLOW, b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nYELLOW"),
-    "/red":    (GRB_RED,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nRED"),
+    "/off":    (GRB_OFF,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n" + CORS + b"\r\nOFF"),
+    "/yellow": (GRB_YELLOW, b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n" + CORS + b"\r\nYELLOW"),
+    "/red":    (GRB_RED,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n" + CORS + b"\r\nRED"),
 }
-NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found"
+NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n" + CORS + b"\r\nNot Found"
 with open("dashboard.html", "r") as f:
-    INDEX_PAGE = b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n" + f.read().encode()
+    INDEX_PAGE = b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n" + CORS + b"\r\n" + f.read().encode()
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
 @rp2.asm_pio(sideset_init = rp2.PIO.OUT_LOW, out_shiftdir = rp2.PIO.SHIFT_LEFT, autopull = True, pull_thresh = 24)
