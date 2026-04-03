@@ -62,6 +62,7 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
 
 ## Gotchas
 
+- **Static IP**: The Pico has a DHCP reservation on the router, so `PICO_IP` never changes
 - **`PICO_IP` vs hostname**: Node.js's `http` module doesn't resolve `.local` mDNS names on Windows — the raw IP is required for `monitor.js` even though the browser can reach `http://onairsign.local` fine
 - **WebREPL**: Connect to the Pico remotely at `http://micropython.org/webrepl` using `ws://<PICO_IP>:8266` to retrieve `log.txt` or update files without USB
 

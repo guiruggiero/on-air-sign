@@ -32,7 +32,7 @@ There are two main components:
 - Periodically runs a PowerShell script (`poll.ps1`) that checks lock state, WiFi SSID, active meeting windows by title, and webcam usage via the Windows Registry
 - Sends HTTP GET requests to the Pico to update LED color on state changes
 - Logs to `host/logs.log` (all events) and `host/errors.log` (errors only); auto-trims at 200KB
-- Requires `PICO_IP` and `HOME_SSID` environment variables
+- Requires `PICO_IP` and `HOME_SSID` environment variables; assign the Pico a static IP via a DHCP reservation on your router so `PICO_IP` stays stable
 
 ---
 
