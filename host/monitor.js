@@ -10,6 +10,7 @@ const HOST_DIR = dirname(fileURLToPath(import.meta.url));
 const LOG_PATH = join(HOST_DIR, "logs.log");
 const ERR_PATH = join(HOST_DIR, "errors.log");
 const LOG_MAX_BYTES = 200_000;
+const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 function trimLog(path) {
     try {
@@ -26,7 +27,7 @@ function log(msg) {
     const now = new Date();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
-    const line = `[${mm}-${dd} ${now.toLocaleTimeString()} ${Intl.DateTimeFormat().resolvedOptions().timeZone}] ${msg}`;
+    const line = `[${mm}-${dd} ${now.toLocaleTimeString()} ${TIMEZONE}] ${msg}`;
     console.log(line);
     try {
         trimLog(LOG_PATH);
@@ -74,6 +75,7 @@ const POLL_PS = Buffer.from(`$HomeSSID = '${HOME_SSID}'\n` + readFileSync(new UR
 function callPico(state, onError) {
     const {endpoint, label} = state;
     const req = http.request({hostname: PICO_IP, port: 80, path: endpoint, method: "GET"}, (res) => {
+        res.resume(); // Drain response body to free socket
         log(`Sign → ${label} (HTTP ${res.statusCode})`);
     });
     req.setTimeout(3000, () => {
@@ -90,7 +92,13 @@ function callPico(state, onError) {
 function poll() {
     let inMeeting, cameraInUse;
     try {
-        [inMeeting, cameraInUse] = runPS(POLL_PS, 10000).split("|");
+        const output = runPS(POLL_PS, 10000);
+        const parts = output.split("|");
+        if (parts.length !== 2) {
+            logError(`Unexpected poll output: ${output}`);
+            return;
+        }
+        [inMeeting, cameraInUse] = parts;
     } catch (e) {
         logError(`Error polling status: ${e.message}`);
         return;
@@ -130,7 +138,7 @@ function schedulePoll() {
 function shutdown() {
     log("Shutting down - turning off sign...");
     callPico(STATES.OFF);
-    setTimeout(() => process.exit(0), 1500); // Give the HTTP request time to fire
+    setTimeout(() => process.exit(0), 3500); // Give the HTTP request time to complete (3s timeout)
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

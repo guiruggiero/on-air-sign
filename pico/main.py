@@ -16,7 +16,7 @@ WEBREPL_PW = secrets.WEBREPL_PW
 
 # Persistent logging to flash
 LOG_PATH = "log.txt"
-LOG_MAX_BYTES = 50_000
+LOG_MAX_BYTES = 20_000
 def log(msg):
     t = time.localtime(time.time() - 8 * 3600)
     line = f"[{t[1]:02}-{t[2]:02} {t[3]:02}:{t[4]:02}:{t[5]:02}] {msg}"
@@ -47,16 +47,15 @@ GRB_YELLOW = _to_grb(204, 153, 0)
 GRB_RED    = _to_grb(255, 0, 0)
 GRB_GREEN  = _to_grb(0, 255, 0)
 
-# Route map: path -> (GRB color, response bytes)
-CORS = b"Access-Control-Allow-Origin: *\r\n"
+# Route map: path -> (GRB color, body text)
+HEADER_TEXT = b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
+HEADER_HTML = b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
+HEADER_404  = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\nAccess-Control-Allow-Origin: *\r\n\r\nNot Found"
 ROUTES = {
-    "/off":    (GRB_OFF,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n" + CORS + b"\r\nOFF"),
-    "/yellow": (GRB_YELLOW, b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n" + CORS + b"\r\nYELLOW"),
-    "/red":    (GRB_RED,    b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n" + CORS + b"\r\nRED"),
+    "/off":    (GRB_OFF,    HEADER_TEXT + b"OFF"),
+    "/yellow": (GRB_YELLOW, HEADER_TEXT + b"YELLOW"),
+    "/red":    (GRB_RED,    HEADER_TEXT + b"RED"),
 }
-NOT_FOUND = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n" + CORS + b"\r\nNot Found"
-with open("dashboard.html", "r") as f:
-    INDEX_PAGE = b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n" + CORS + b"\r\n" + f.read().encode()
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
 @rp2.asm_pio(sideset_init = rp2.PIO.OUT_LOW, out_shiftdir = rp2.PIO.SHIFT_LEFT, autopull = True, pull_thresh = 24)
@@ -85,15 +84,24 @@ def set_sign(grb):
     sm.put(pixel_data, 8) # Send to PIO
     time.sleep_ms(10) # Brief settle time to ensure the PIO FIFO buffer is cleared
 
+# Sync local clock to NTP time
+def sync_ntp():
+    try:
+        import ntptime
+        ntptime.settime()
+        log("NTP time synced")
+    except Exception:
+        log("NTP sync failed")
+
 # Connect to WiFi
 wlan = network.WLAN(network.STA_IF)
-def connect_wifi():
+def connect_wifi(initial=False):
     wlan.active(True)
     if not wlan.isconnected():
         wlan.connect(SSID, PASSWORD)
         log("Connecting to WiFi...")
         on = False
-        for _ in range(40):  # 20s timeout
+        for _ in range(40): # 20s timeout
             if wlan.isconnected():
                 break
             on = not on
@@ -104,19 +112,16 @@ def connect_wifi():
             log("WiFi connection failed, resetting...")
             machine.reset()
 
-    set_sign(GRB_GREEN) # Solid green when connected
     ip = wlan.ifconfig()[0]
     log(f"Connected! IP: {ip}")
-    try:
-        import ntptime
-        ntptime.settime()
-        log("NTP time synced")
-    except Exception:
-        log("NTP sync failed")
-    time.sleep(3)
-    set_sign(GRB_OFF)
+    sync_ntp()
+    if initial:
+        set_sign(GRB_GREEN) # Solid green on first boot
+        time.sleep(3)
+        set_sign(GRB_OFF)
     return ip
-ip = connect_wifi()
+
+ip = connect_wifi(initial=True)
 
 # mDNS responder for http://onairsign.local
 from mdns import MDNSResponder
@@ -146,10 +151,17 @@ s = None
 start_server()
 log(f"Listening on http://{ip}")
 last_command_time = time.ticks_ms()
+last_ntp_sync = time.ticks_ms()
+NTP_SYNC_INTERVAL = 24 * 60 * 60 * 1000 # 24 hours
 
 while True:
     gc.collect() # Periodically clean up memory
     mdns.process() # Handle mDNS queries
+
+    # Periodic NTP re-sync to correct clock drift
+    if time.ticks_diff(time.ticks_ms(), last_ntp_sync) > NTP_SYNC_INTERVAL:
+        sync_ntp()
+        last_ntp_sync = time.ticks_ms()
 
     # Watchdog: turn off sign if monitor stopped sending commands
     if pixel_data[0] != GRB_OFF and time.ticks_diff(time.ticks_ms(), last_command_time) > 300_000: # 5m timeout
@@ -177,7 +189,7 @@ while True:
             continue # Skip malformed binary requests
 
         # Extract path from HTTP request
-        first_line = request.split("\r\n", 1)[0]  # e.g., "GET /yellow HTTP/1.1"
+        first_line = request.split("\r\n", 1)[0] # e.g., "GET /yellow HTTP/1.1"
         parts = first_line.split(" ")
         path = parts[1] if len(parts) >= 2 else ""
 
@@ -189,9 +201,11 @@ while True:
             last_command_time = time.ticks_ms()
             conn.send(response)
         elif path == "/":
-            conn.send(INDEX_PAGE)
+            conn.send(HEADER_HTML)
+            with open("dashboard.html", "r") as f:
+                conn.send(f.read())
         else:
-            conn.send(NOT_FOUND)
+            conn.send(HEADER_404)
 
     except OSError as e:
         if e.args[0] == 110: # ETIMEDOUT, no client connected, loop back

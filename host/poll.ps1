@@ -11,8 +11,7 @@ if ($ssid -ne $HomeSSID) { "false|false"; exit }
 
 # Check meeting
 $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object -ExpandProperty MainWindowTitle
-# TODO: "Microsoft Teams" matches the app even when not in a meeting — verify the in-call window title and replace with a more specific pattern (likely "| Microsoft Teams" or "Call | Microsoft Teams")
-$meetingPatterns = @("Zoom Meeting", "Huddle", "Amazon Chime:", "Meet -", "Meet –", "Microsoft Teams")
+$meetingPatterns = @("Zoom Meeting", "Huddle", "Amazon Chime:", "Meet -", "Meet –", "| Microsoft Teams")
 $inMeeting = $false
 foreach ($title in $titles) {
     foreach ($pattern in $meetingPatterns) {

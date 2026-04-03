@@ -28,14 +28,15 @@ Two completely separate components that communicate over HTTP on the local netwo
 
 ### `pico/main.py` — MicroPython on Raspberry Pi Pico 2 W
 - Runs a bare HTTP server on port 80 (no framework, no external libraries)
-- Accepts `GET /off`, `GET /yellow`, `GET /red` to set LED color; `GET /` serves a control dashboard (loaded from `dashboard.html`)
+- Accepts `GET /off`, `GET /yellow`, `GET /red` to set LED color; `GET /` serves a control dashboard (streamed from `dashboard.html` on flash)
 - Reachable at `http://onairsign.local` via a custom mDNS responder (`pico/mdns.py`)
 - Drives a 12-LED WS2812 NeoPixel ring on **GP4** using Pico's PIO state machine (bit-banged at 8 MHz, GRB color order)
-- On boot: blinks green while connecting to WiFi, shows solid green for 3s when connected, then turns off
+- On boot: blinks green while connecting to WiFi, shows solid green for 3s when connected, then turns off; on WiFi reconnect, blinks green but skips the 3s pause to resume serving faster
 - Auto-reconnects and restarts server if WiFi is lost; resets the Pico if initial connection fails after 20s
 - Uses a 5-second socket accept timeout to keep the main loop non-blocking
 - Watchdog: turns off the sign if no command is received within 5 minutes (covers monitor crash, PC sleep, etc.)
-- Logs to `log.txt` on flash with timestamps (PST via NTP sync, UTC-8 offset); auto-trims at 50KB keeping the newest half; retrievable via WebREPL
+- Logs to `log.txt` on flash with timestamps (PST via NTP sync, UTC-8 offset); auto-trims at 20KB keeping the newest half; retrievable via WebREPL
+- Re-syncs NTP every 24 hours to correct clock drift
 
 ### `host/monitor.js` — Node.js on Windows host
 - No npm dependencies; uses only Node.js built-ins (`child_process`, `fs`, `http`, `url`, `path`); requires PowerShell 7+ (`pwsh`)

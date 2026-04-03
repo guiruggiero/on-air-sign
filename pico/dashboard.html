@@ -45,15 +45,15 @@
 
             function flash(t) {
                 var m = document.getElementById("msg");
-                m.innerHTML = t;
+                m.textContent = t;
                 m.style.opacity = 1;
                 setTimeout(function () {m.style.opacity = 0}, 2000)
             }
 
             function send(p) {
                 fetch(base + p)
-                .then(function (r) {r.ok ? flash("&#x2714; Sent") : flash("&#x2718; Failed")})
-                .catch(function () {flash("&#x2718; Failed")})
+                .then(function (r) {r.ok ? flash("\u2714 Sent") : flash("\u2718 Failed")})
+                .catch(function () {flash("\u2718 Failed")})
             }
         </script>
     </body>
