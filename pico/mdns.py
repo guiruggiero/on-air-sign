@@ -4,6 +4,7 @@
 # Imports
 import socket
 import struct
+import time
 
 # Initializations
 MDNS_ADDR = "224.0.0.251" # mDNS multicast group
@@ -45,10 +46,20 @@ class MDNSResponder:
 
     def start(self):
         self.stop()
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._sock.setblocking(False)
-        self._sock.bind(("0.0.0.0", MDNS_PORT))
+        for attempt in range(5):
+            try:
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self._sock.setblocking(False)
+                self._sock.bind(("0.0.0.0", MDNS_PORT))
+                break
+            except OSError:
+                self._sock.close()
+                self._sock = None
+                if attempt < 4:
+                    time.sleep(1)
+                else:
+                    raise
 
         # Join the mDNS multicast group to receive queries
         mcast = struct.pack("4s4s", socket.inet_aton(MDNS_ADDR), socket.inet_aton("0.0.0.0"))
