@@ -50,6 +50,7 @@ const HOME_SSID = process.env.HOME_SSID;
 const IDLE_POLL_INTERVAL_MS = 15000; // 15 seconds when no meeting
 const ACTIVE_POLL_INTERVAL_MS = 5000; // 5 seconds during a meeting (camera responsiveness)
 let currentState = null;
+let shuttingDown = false;
 const STATES = {
     OFF:    {endpoint: "/off",    label: "OFF ⚫"},
     YELLOW: {endpoint: "/yellow", label: "YELLOW 🟡"},
@@ -100,7 +101,7 @@ function poll() {
         }
         [inMeeting, cameraInUse] = parts;
     } catch (e) {
-        if (e.killed || e.signal) return; // Killed by shutdown signal, not an error
+        if (shuttingDown) return; // Killed by shutdown signal, not an error
         logError(`Error polling status: ${e.message}`);
         return;
     }
@@ -137,6 +138,7 @@ function schedulePoll() {
 
 // Graceful shutdown
 function shutdown() {
+    shuttingDown = true;
     log("Shutting down - turning off sign...");
     callPico(STATES.OFF);
     setTimeout(() => process.exit(0), 3500); // Give the HTTP request time to complete (3s timeout)
