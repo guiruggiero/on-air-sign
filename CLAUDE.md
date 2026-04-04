@@ -13,6 +13,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 node host/monitor.js
 ```
 
+## Autostart via Task Scheduler
+
+The monitor runs on login via Windows Task Scheduler. The real files are gitignored (contain username/SID); use the `.example` files as templates:
+
+1. Copy `host/launch-monitor.vbs.example` → `host/launch-monitor.vbs` and fill in your Node path and repo path
+2. Copy `host/On Air sign monitor.xml.example` → `host/On Air sign monitor.xml`; edit `DOMAIN\username`, `DATE`, and the paths in `<Arguments>` and `<WorkingDirectory>`
+3. Open Task Scheduler → Action → Import Task, and select `host\On Air sign monitor.xml`
+
 ## Deploying to the Pico
 
 Upload the files from `pico/` (`main.py` and `dashboard.html`) to the Pico 2 W using Thonny. `main.py` runs automatically on boot. A `secrets.py` must exist on the Pico (gitignored) with:
@@ -70,3 +78,5 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
 - `pico/secrets.py` — gitignored, lives only on the Pico
 - `host/monitor.js` — host monitor (Node.js ES Modules), loads `poll.ps1` at startup
 - `host/poll.ps1` — PowerShell script that checks computer lock state, WiFi SSID, meeting windows, and webcam status (in that order); `HOME_SSID` is injected by `monitor.js`
+- `host/launch-monitor.vbs.example` — template for the VBScript that launches the monitor silently; copy to `launch-monitor.vbs` and fill in paths
+- `host/On Air sign monitor.xml.example` — template for the Task Scheduler task; copy to `On Air sign monitor.xml`, fill in `DOMAIN\username` and paths, then import via Task Scheduler → Action → Import Task

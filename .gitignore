@@ -2,3 +2,5 @@ secrets.py
 .env
 AGENTS.md
 *.log
+host/launch-monitor.vbs
+host/On Air sign monitor.xml

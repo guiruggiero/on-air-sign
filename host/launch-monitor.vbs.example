@@ -1,0 +1,2 @@
+Set sh = CreateObject("WScript.Shell")
+sh.Run "<PATH_TO_NODE_EXE> <PATH_TO_REPO>\host\monitor.js", 0, False
