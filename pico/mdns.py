@@ -35,7 +35,16 @@ class MDNSResponder:
         self._ip_bytes = bytes(int(b) for b in ip.split("."))
         self._sock = None
 
+    def stop(self):
+        if self._sock:
+            try:
+                self._sock.close()
+            except OSError:
+                pass
+            self._sock = None
+
     def start(self):
+        self.stop()
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._sock.setblocking(False)
