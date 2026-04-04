@@ -100,6 +100,7 @@ function poll() {
         }
         [inMeeting, cameraInUse] = parts;
     } catch (e) {
+        if (e.killed || e.signal) return; // Killed by shutdown signal, not an error
         logError(`Error polling status: ${e.message}`);
         return;
     }
@@ -148,5 +149,5 @@ setInterval(() => {
     log(`♥ Alive - current state: ${currentState?.label ?? "none"}`);
 }, HEARTBEAT_INTERVAL_MS);
 
-log(`Poll interval: idle ${IDLE_POLL_INTERVAL_MS / 1000}s, active ${ACTIVE_POLL_INTERVAL_MS / 1000}s\nMeeting/webcam monitor started...\n`);
+log(`Poll interval: idle ${IDLE_POLL_INTERVAL_MS / 1000}s, active ${ACTIVE_POLL_INTERVAL_MS / 1000}s\nMeeting/webcam monitor started...`);
 schedulePoll();
