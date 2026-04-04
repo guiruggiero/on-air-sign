@@ -15,7 +15,7 @@ node host/monitor.js
 
 ## Deploying to the Pico
 
-Upload the files from `pico/` (`main.py`, `mdns.py`, and `dashboard.html`) to the Pico 2 W using Thonny. `main.py` runs automatically on boot. A `secrets.py` must exist on the Pico (gitignored) with:
+Upload the files from `pico/` (`main.py` and `dashboard.html`) to the Pico 2 W using Thonny. `main.py` runs automatically on boot. A `secrets.py` must exist on the Pico (gitignored) with:
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
@@ -29,7 +29,6 @@ Two completely separate components that communicate over HTTP on the local netwo
 ### `pico/main.py` — MicroPython on Raspberry Pi Pico 2 W
 - Runs a bare HTTP server on port 80 (no framework, no external libraries)
 - Accepts `GET /off`, `GET /yellow`, `GET /red` to set LED color; `GET /` serves a control dashboard (streamed from `dashboard.html` on flash)
-- Reachable at `http://onairsign.local` via a custom mDNS responder (`pico/mdns.py`)
 - Drives a 12-LED WS2812 NeoPixel ring on **GP4** using Pico's PIO state machine (bit-banged at 8 MHz, GRB color order)
 - On boot: blinks green while connecting to WiFi, shows solid green for 3s when connected, then turns off; on WiFi reconnect, blinks green but skips the 3s pause to resume serving faster
 - Auto-reconnects and restarts server if WiFi is lost; resets the Pico if initial connection fails after 20s
@@ -63,12 +62,10 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
 ## Gotchas
 
 - **Static IP**: The Pico has a DHCP reservation on the router, so `PICO_IP` never changes
-- **`PICO_IP` vs hostname**: Node.js's `http` module doesn't resolve `.local` mDNS names on Windows — the raw IP is required for `monitor.js` even though the browser can reach `http://onairsign.local` fine
 - **WebREPL**: Connect to the Pico remotely at `http://micropython.org/webrepl` using `ws://<PICO_IP>:8266` to retrieve `log.txt` or update files without USB
 
 ## Key files
 - `pico/main.py` — entire Pico firmware (single file, MicroPython)
-- `pico/mdns.py` — minimal mDNS responder, makes the Pico reachable at `onairsign.local`
 - `pico/dashboard.html` — web control panel, served by Pico at `/` and also usable as a local file
 - `pico/secrets.py` — gitignored, lives only on the Pico
 - `host/monitor.js` — host monitor (Node.js ES Modules), loads `poll.ps1` at startup

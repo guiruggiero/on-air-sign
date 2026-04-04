@@ -123,11 +123,6 @@ def connect_wifi(initial=False):
 
 ip = connect_wifi(initial=True)
 
-# mDNS responder for http://onairsign.local
-from mdns import MDNSResponder
-mdns = MDNSResponder("onairsign", ip)
-mdns.start()
-
 # WebREPL for updating files over WiFi
 try:
     import webrepl
@@ -156,7 +151,6 @@ NTP_SYNC_INTERVAL = 24 * 60 * 60 * 1000 # 24 hours
 
 while True:
     gc.collect() # Periodically clean up memory
-    mdns.process() # Handle mDNS queries
 
     # Periodic NTP re-sync to correct clock drift
     if time.ticks_diff(time.ticks_ms(), last_ntp_sync) > NTP_SYNC_INTERVAL:

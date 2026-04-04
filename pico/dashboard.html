@@ -41,7 +41,11 @@
         <div id="msg"></div>
 
         <script>
-            var base = location.protocol === "file:" ? "http://onairsign.local" : "";
+            var base = "";
+            if (location.protocol === "file:") {
+                var ip = prompt("Enter Pico IP address (e.g. 192.168.1.x):");
+                base = ip ? "http://" + ip.trim() : "";
+            }
 
             function flash(t) {
                 var m = document.getElementById("msg");

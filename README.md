@@ -22,10 +22,9 @@ There are two main components:
 - A MicroPython script — no external libraries required
 - NeoPixel data line on **GP4**, controlled via Pico's PIO state machine
 - Connects to WiFi and runs an HTTP server with endpoints for LED control (`/off`, `/yellow`, `/red`) and a web dashboard (`/`)
-- Reachable at [http://onairsign.local](http://onairsign.local) via a built-in mDNS responder (`mdns.py`)
 - Requires a `secrets.py` on the Pico with `SSID`, `PASSWORD`, and `WEBREPL_PW`
 - Logs to `log.txt` on flash (PST timestamps via NTP, re-synced every 24h); auto-trims at 20KB; retrievable via WebREPL
-- Upload `main.py`, `mdns.py`, and `dashboard.html` with Thonny
+- Upload `main.py` and `dashboard.html` with Thonny
 
 #### Host monitor script (`host/`)
 - A Node.js script for Windows — no npm packages required, uses PowerShell 7 (`pwsh`)
