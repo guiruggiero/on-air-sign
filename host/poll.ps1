@@ -2,7 +2,9 @@
 $ProgressPreference = "SilentlyContinue"
 
 # Check computer lock (meeting shorthand)
-if (Get-Process -Name LogonUI -ErrorAction SilentlyContinue) { "false|false"; exit }
+# LockApp.exe only runs on a true lock screen; LogonUI alone can be a credential popup (e.g. Midway re-auth)
+$isLocked = (Get-Process -Name LockApp -ErrorAction SilentlyContinue) -and (Get-Process -Name LogonUI -ErrorAction SilentlyContinue)
+if ($isLocked) { "false|false"; exit }
 
 # Check WiFi SSID
 $ssidLine = (netsh wlan show interfaces) | Select-String "(?<!\w)SSID\s" | Select-Object -First 1
