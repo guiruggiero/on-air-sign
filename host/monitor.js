@@ -25,9 +25,9 @@ function trimLog(path) {
 
 function log(msg) {
     const now = new Date();
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    const line = `[${mm}-${dd} ${now.toLocaleTimeString()} ${TIMEZONE}] ${msg}`;
+    const date = now.toLocaleDateString([], { month: "2-digit", day: "2-digit" });
+    const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+    const line = `[${date} ${time} ${TIMEZONE}] ${msg}`;
     console.log(line);
     try {
         trimLog(LOG_PATH);
