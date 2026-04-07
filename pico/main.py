@@ -15,25 +15,25 @@ PASSWORD = secrets.PASSWORD
 WEBREPL_PW = secrets.WEBREPL_PW
 
 # Persistent logging to flash
-LOG_PATH = "log.txt"
-LOG_MAX_BYTES = 20_000
+LOGS_PATH = "logs.txt"
+LOGS_MAX_BYTES = 20_000
 def log(msg):
     t = time.localtime(time.time() - 8 * 3600)
     line = f"[{t[1]:02}-{t[2]:02} {t[3]:02}:{t[4]:02}:{t[5]:02}] {msg}"
     print(line)
     try:
         try:
-            size = os.stat(LOG_PATH)[6]
+            size = os.stat(LOGS_PATH)[6]
         except OSError:
             size = 0
-        if size > LOG_MAX_BYTES:
-            with open(LOG_PATH, "r") as f:
+        if size > LOGS_MAX_BYTES:
+            with open(LOGS_PATH, "r") as f:
                 f.seek(size // 2)
                 f.readline() # Discard the partial line at the seek point
                 keep = f.read()
-            with open(LOG_PATH, "w") as f:
+            with open(LOGS_PATH, "w") as f:
                 f.write(keep)
-        with open(LOG_PATH, "a") as f:
+        with open(LOGS_PATH, "a") as f:
             f.write(line + "\n")
     except Exception:
         pass
