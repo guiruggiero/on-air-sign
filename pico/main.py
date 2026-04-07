@@ -15,25 +15,40 @@ PASSWORD = secrets.PASSWORD
 WEBREPL_PW = secrets.WEBREPL_PW
 
 # Persistent logging to flash
-LOGS_PATH = "logs.txt"
-LOGS_MAX_BYTES = 20_000
+LOG_PATH = "logs.log"
+ERR_PATH = "errors.log"
+LOG_MAX_BYTES = 20_000
+
+def trim_log(path):
+    try:
+        size = os.stat(path)[6]
+        if size > LOG_MAX_BYTES:
+            with open(path, "r") as f:
+                f.seek(size // 2)
+                f.readline() # Discard the partial line at the seek point
+                keep = f.read()
+            with open(path, "w") as f:
+                f.write(keep)
+    except OSError:
+        pass
+
 def log(msg):
     t = time.localtime(time.time() - 8 * 3600)
     line = f"[{t[1]:02}-{t[2]:02} {t[3]:02}:{t[4]:02}:{t[5]:02}] {msg}"
     print(line)
     try:
-        try:
-            size = os.stat(LOGS_PATH)[6]
-        except OSError:
-            size = 0
-        if size > LOGS_MAX_BYTES:
-            with open(LOGS_PATH, "r") as f:
-                f.seek(size // 2)
-                f.readline() # Discard the partial line at the seek point
-                keep = f.read()
-            with open(LOGS_PATH, "w") as f:
-                f.write(keep)
-        with open(LOGS_PATH, "a") as f:
+        trim_log(LOG_PATH)
+        with open(LOG_PATH, "a") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+    return line
+
+def log_error(msg):
+    line = log(msg)
+    try:
+        trim_log(ERR_PATH)
+        with open(ERR_PATH, "a") as f:
             f.write(line + "\n")
     except Exception:
         pass
@@ -92,7 +107,7 @@ def sync_ntp():
         ntptime.settime()
         log("NTP time synced")
     except Exception:
-        log("NTP sync failed")
+        log_error("NTP sync failed")
 
 # Connect to WiFi
 wlan = network.WLAN(network.STA_IF)
@@ -110,7 +125,7 @@ def connect_wifi(initial=False):
             time.sleep(0.5)
         else:
             set_sign(GRB_OFF)
-            log("WiFi connection failed, resetting...")
+            log_error("WiFi connection failed, resetting...")
             machine.reset()
 
     ip = wlan.ifconfig()[0]
@@ -129,7 +144,7 @@ try:
     import webrepl
     webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266
 except Exception:
-    log("WebREPL not available")
+    log_error("WebREPL not available")
 
 # Start server
 def start_server():
@@ -168,7 +183,7 @@ while True:
     try:
         # Check WiFi status and reconnect if needed
         if not wlan.isconnected():
-            log("WiFi lost, reconnecting...")
+            log_error("WiFi lost, reconnecting...")
             connect_wifi()
             start_server()
 
@@ -212,11 +227,11 @@ while True:
         if e.args[0] == 110: # ETIMEDOUT, no client connected, loop back
             pass
         else:
-            log(f"Server error: {e}")
+            log_error(f"Server error: {e}")
             start_server() # Recover from socket corruption
 
     except Exception as e:
-        log(f"Server error: {e}")
+        log_error(f"Server error: {e}")
 
     finally:
         if conn:
