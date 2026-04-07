@@ -211,6 +211,14 @@ while True:
             set_sign(grb)
             last_command_time = time.ticks_ms()
             conn.send(response)
+        elif path == "/logs" or path == "/errors":
+            log_file = ERR_PATH if path == "/errors" else LOG_PATH
+            conn.send(HEADER_TEXT)
+            try:
+                with open(log_file, "r") as f:
+                    conn.send(f.read())
+            except OSError:
+                conn.send(b"No logs")
         elif path == "/stats":
             gc.collect()
             uptime_s = time.ticks_diff(time.ticks_ms(), boot_time) // 1000
