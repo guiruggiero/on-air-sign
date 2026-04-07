@@ -5,8 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the monitor
 
 ```powershell
-# Set required environment variables (Windows, user scope)
-[System.Environment]::SetEnvironmentVariable("PICO_IP", "<ip_address>", "User")
+# Set required environment variable (Windows, user scope)
 [System.Environment]::SetEnvironmentVariable("HOME_SSID", "<network_name>", "User")
 
 # Run
@@ -36,13 +35,13 @@ Two completely separate components that communicate over HTTP on the local netwo
 
 ### `pico/main.py` — MicroPython on Raspberry Pi Pico 2 W
 - Runs a bare HTTP server on port 80 (no framework, no external libraries)
-- Accepts `GET /off`, `GET /yellow`, `GET /red` to set LED color; `GET /` serves a control dashboard (streamed from `dashboard.html` on flash)
+- Accepts `GET /off`, `GET /yellow`, `GET /red` to set LED color; `GET /` serves a control dashboard (streamed from `dashboard.html` on flash); `GET /stats` returns JSON with memory usage and uptime
 - Drives a 12-LED WS2812 NeoPixel ring on **GP4** using Pico's PIO state machine (bit-banged at 8 MHz, GRB color order)
 - On boot: blinks green while connecting to WiFi, shows solid green for 3s when connected, then turns off; on WiFi reconnect, blinks green but skips the 3s pause to resume serving faster
 - Auto-reconnects and restarts server if WiFi is lost; resets the Pico if initial connection fails after 20s
 - Uses a 5-second socket accept timeout to keep the main loop non-blocking
 - Watchdog: turns off the sign if no command is received within 5 minutes (covers monitor crash, PC sleep, etc.)
-- Logs to `log.txt` on flash with timestamps (PST via NTP sync, UTC-8 offset); auto-trims at 20KB keeping the newest half; retrievable via WebREPL
+- Logs to `logs.log` and `errors.log` on flash with timestamps (PST via NTP sync, UTC-8 offset); auto-trims at 20KB keeping the newest half; retrievable via WebREPL
 - Re-syncs NTP every 24 hours to correct clock drift
 
 ### `host/monitor.js` — Node.js on Windows host
@@ -69,14 +68,14 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
 
 ## Gotchas
 
-- **Static IP**: The Pico has a DHCP reservation on the router, so `PICO_IP` never changes
-- **WebREPL**: Connect to the Pico remotely at `http://micropython.org/webrepl` using `ws://<PICO_IP>:8266` to retrieve `log.txt` or update files without USB
+- **Static IP**: The Pico has a DHCP reservation at `192.168.0.209`
+- **WebREPL**: Connect to the Pico remotely at `http://micropython.org/webrepl` using `ws://192.168.0.209:8266` to retrieve logs or update files without USB
 
 ## Key files
 - `pico/main.py` — entire Pico firmware (single file, MicroPython)
 - `pico/dashboard.html` — web control panel, served by Pico at `/` and also usable as a local file
 - `pico/secrets.py` — gitignored, lives only on the Pico
 - `host/monitor.js` — host monitor (Node.js ES Modules), loads `poll.ps1` at startup
-- `host/poll.ps1` — PowerShell script that checks computer lock state, WiFi SSID, meeting windows, and webcam status (in that order); `HOME_SSID` is injected by `monitor.js`
+- `host/poll.ps1` — PowerShell script that checks computer lock state (requires both `LockApp.exe` and `LogonUI.exe` to distinguish real lock from credential popups), WiFi SSID, meeting windows, and webcam status (in that order); `HOME_SSID` is injected by `monitor.js`
 - `host/launch-monitor.vbs.example` — template for the VBScript that launches the monitor silently; copy to `launch-monitor.vbs` and fill in paths
 - `host/On Air sign monitor.xml.example` — template for the Task Scheduler task; copy to `On Air sign monitor.xml`, fill in `DOMAIN\username` and paths, then import via Task Scheduler → Action → Import Task

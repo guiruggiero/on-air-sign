@@ -45,7 +45,7 @@ function logError(msg) {
 }
 
 // Initializations
-const PICO_IP = process.env.PICO_IP;
+const PICO_IP = "192.168.0.209";
 const HOME_SSID = process.env.HOME_SSID;
 const IDLE_POLL_INTERVAL_MS = 15000; // 15 seconds when no meeting
 const ACTIVE_POLL_INTERVAL_MS = 5000; // 5 seconds during a meeting (camera responsiveness)
@@ -59,8 +59,8 @@ const STATES = {
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Initial check if env variables are set
-if (!PICO_IP || !HOME_SSID) {
-    logError("Environment variables not set. Terminating");
+if (!HOME_SSID) {
+    logError("HOME_SSID environment variable not set. Terminating");
     process.exit(1);
 }
 

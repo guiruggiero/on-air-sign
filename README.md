@@ -19,16 +19,15 @@ WEBREPL_PW = "<webrepl_password>"
 Wire the WS2812 NeoPixel ring data line to **GP4**.
 
 ### Host monitor (Windows)
-Requires Node.js and PowerShell 7 (`pwsh`). Set environment variables:
+Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variable:
 ```powershell
-[System.Environment]::SetEnvironmentVariable("PICO_IP", "<pico_ip>", "User")
 [System.Environment]::SetEnvironmentVariable("HOME_SSID", "<your_ssid>", "User")
 ```
 Then run:
 ```powershell
 node host/monitor.js
 ```
-Assign the Pico a static IP via a DHCP reservation on your router so `PICO_IP` never changes.
+Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `monitor.js` never changes.
 
 ### Autostart
 To run the monitor automatically on login via Windows Task Scheduler:
