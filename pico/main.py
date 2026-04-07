@@ -50,6 +50,7 @@ GRB_GREEN  = _to_grb(0, 255, 0)
 # Route map: path -> (GRB color, body text)
 HEADER_TEXT = b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
 HEADER_HTML = b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
+HEADER_JSON = b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
 HEADER_404  = b"HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\nAccess-Control-Allow-Origin: *\r\n\r\nNot Found"
 ROUTES = {
     "/off":    (GRB_OFF,    HEADER_TEXT + b"OFF"),
@@ -147,6 +148,7 @@ start_server()
 log(f"Listening on http://{ip}")
 last_command_time = time.ticks_ms()
 last_ntp_sync = time.ticks_ms()
+boot_time = time.ticks_ms()
 NTP_SYNC_INTERVAL = 24 * 60 * 60 * 1000 # 24 hours
 
 while True:
@@ -194,6 +196,11 @@ while True:
             set_sign(grb)
             last_command_time = time.ticks_ms()
             conn.send(response)
+        elif path == "/stats":
+            gc.collect()
+            uptime_s = time.ticks_diff(time.ticks_ms(), boot_time) // 1000
+            conn.send(HEADER_JSON)
+            conn.send(f'{{"mem_free":{gc.mem_free()},"mem_alloc":{gc.mem_alloc()},"uptime_s":{uptime_s}}}')
         elif path == "/":
             conn.send(HEADER_HTML)
             with open("dashboard.html", "r") as f:

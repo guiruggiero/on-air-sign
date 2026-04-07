@@ -28,6 +28,12 @@
                 opacity: 0;
                 transition: opacity .3s
             }
+
+            #stats {
+                margin-top: 1.5em;
+                font-size: .9em;
+                color: #555;
+            }
         </style>
     </head>
 
@@ -39,6 +45,8 @@
         <button onclick="send('/red')" style="background:#FF0000;color:#FFFFFF">RED</button>
 
         <div id="msg"></div>
+
+        <div id="stats">Loading stats…</div>
 
         <script>
             var base = "";
@@ -59,6 +67,33 @@
                 .then(function (r) {r.ok ? flash("\u2714 Sent") : flash("\u2718 Failed")})
                 .catch(function () {flash("\u2718 Failed")})
             }
+
+            function fmtUptime(s) {
+                var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
+                    m = Math.floor(s % 3600 / 60), sec = s % 60;
+                if (d > 0) return d + "d " + h + "h " + m + "m";
+                if (h > 0) return h + "h " + m + "m " + sec + "s";
+                if (m > 0) return m + "m " + sec + "s";
+                return sec + "s";
+            }
+
+            function getStats() {
+                fetch(base + "/stats")
+                .then(function (r) {return r.json()})
+                .then(function (d) {
+                    var total = d.mem_free + d.mem_alloc;
+                    var pct = Math.round(d.mem_alloc / total * 100);
+                    document.getElementById("stats").textContent =
+                        "Memory: " + Math.round(d.mem_alloc / 1024) + " KB used / " +
+                        Math.round(total / 1024) + " KB total (" + pct + "%) \u00b7 " +
+                        "Uptime: " + fmtUptime(d.uptime_s);
+                })
+                .catch(function () {
+                    document.getElementById("stats").textContent = "Stats unavailable";
+                });
+            }
+
+            getStats();
         </script>
     </body>
 </html>
