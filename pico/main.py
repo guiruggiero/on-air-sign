@@ -160,7 +160,7 @@ def start_server():
     s.settimeout(5.0)
 s = None
 start_server()
-log(f"Server started. Listening")
+log(f"Server started! Listening...")
 last_command_time = time.ticks_ms()
 last_ntp_sync = time.ticks_ms()
 boot_time = time.ticks_ms()

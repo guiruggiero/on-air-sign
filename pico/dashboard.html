@@ -25,6 +25,7 @@
             #msg {
                 margin-top: 10px;
                 font-size: 1em;
+                min-height: 1.5em;
                 opacity: 0;
                 transition: opacity .3s
             }
@@ -42,11 +43,11 @@
 
         <button onclick="send('/off')" style="background:#CCCCCC">OFF</button>
         <button onclick="send('/yellow')" style="background:#CC9900">YELLOW</button>
-        <button onclick="send('/red')" style="background:#FF0000;color:#FFFFFF">RED</button>
+        <button onclick="send('/red')" style="background:#FF0000; color:#FFFFFF">RED</button>
 
         <div id="msg"></div>
 
-        <div id="stats">Loading stats…</div>
+        <div id="stats">Loading stats...</div>
 
         <div id="links" style="margin-top:1.5em;font-size:.9em">
             <a href="" id="logs-link" target="_blank">Logs</a> · <a href="" id="errors-link" target="_blank">Errors</a> · <a href="http://micropython.org/webrepl/?#192.168.0.209:8266" target="_blank">WebREPL</a>
@@ -85,10 +86,9 @@
                 .then(function (d) {
                     var total = d.mem_free + d.mem_alloc;
                     var pct = Math.round(d.mem_alloc / total * 100);
-                    document.getElementById("stats").textContent =
-                        "Memory: " + Math.round(d.mem_alloc / 1024) + " KB used / " +
-                        Math.round(total / 1024) + " KB total (" + pct + "%) \u00b7 " +
-                        "Uptime: " + fmtUptime(d.uptime_s);
+                    document.getElementById("stats").innerHTML =
+                        "<b>Memory: " + pct + "% used</b> (" + Math.round(d.mem_alloc / 1024) + "/" +
+                            Math.round(total / 1024) + " KB total) \u00b7 <b>Uptime: " + fmtUptime(d.uptime_s) + "</b>";
                 })
                 .catch(function () {
                     document.getElementById("stats").textContent = "Stats unavailable";
