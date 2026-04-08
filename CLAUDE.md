@@ -22,7 +22,7 @@ The monitor runs on login via Windows Task Scheduler. The real files are gitigno
 
 ## Deploying to the Pico
 
-Upload the files from `pico/` (`main.py` and `dashboard.html`) to the Pico 2 W using Thonny. `main.py` runs automatically on boot. A `secrets.py` must exist on the Pico (gitignored) with:
+Upload `main.py` and `dashboard.html` from `pico/` to the Pico 2 W using Thonny. `main.py` runs automatically on boot. A `secrets.py` must exist on the Pico (gitignored) with:
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
@@ -74,6 +74,7 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
 ## Key files
 - `pico/main.py` — entire Pico firmware (single file, MicroPython)
 - `pico/dashboard.html` — web control panel, served by Pico at `/` and also usable as a local file
+- `pico/onairsign.html` — redirect page hosted on a personal website; navigates to the Pico's dashboard so you don't need to remember the IP
 - `pico/secrets.py` — gitignored, lives only on the Pico
 - `host/monitor.js` — host monitor (Node.js ES Modules), loads `poll.ps1` at startup
 - `host/poll.ps1` — PowerShell script that checks computer lock state (requires both `LockApp.exe` and `LogonUI.exe` to distinguish real lock from credential popups), WiFi SSID, meeting windows, and webcam status (in that order); `HOME_SSID` is injected by `monitor.js`

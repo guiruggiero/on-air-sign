@@ -18,6 +18,8 @@ WEBREPL_PW = "<webrepl_password>"
 ```
 Wire the WS2812 NeoPixel ring data line to **GP4**.
 
+Optionally, upload `pico/onairsign.html` to your personal website for easy access to the dashboard without remembering the IP.
+
 ### Host monitor (Windows)
 Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variable:
 ```powershell
