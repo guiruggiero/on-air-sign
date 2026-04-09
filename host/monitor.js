@@ -25,8 +25,8 @@ function trimLog(path) {
 
 function log(msg) {
     const now = new Date();
-    const date = now.toLocaleDateString([], { month: "2-digit", day: "2-digit" });
-    const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+    const date = now.toLocaleDateString([], {month: "2-digit", day: "2-digit"});
+    const time = now.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false});
     const line = `[${date} ${time} ${TIMEZONE}] ${msg}`;
     console.log(line);
     try {
@@ -121,7 +121,7 @@ function poll() {
     if (newState !== currentState) {
         const prevState = currentState;
         currentState = newState;
-        callPico(newState, () => { currentState = prevState; });
+        callPico(newState, () => {currentState = prevState});
     } else {
         callPico(newState); // Heartbeat for Pico watchdog
     }
