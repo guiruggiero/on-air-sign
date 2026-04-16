@@ -18,6 +18,8 @@ WEBREPL_PW = "<webrepl_password>"
 ```
 Wire the WS2812 NeoPixel ring data line to **GP4**.
 
+Print and assemble the enclosures from `enclosures/` — a snap-fit box for the NeoPixel ring and a case for the Pico 2 W. See [`enclosures/README.md`](enclosures/README.md) for print settings.
+
 Optionally, upload `pico/onairsign.html` to your personal website for easy access to the dashboard without remembering the IP.
 
 ### Host monitor (Windows)

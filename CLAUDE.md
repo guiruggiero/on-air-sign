@@ -80,3 +80,4 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
 - `host/poll.ps1` — PowerShell script that checks computer lock state (requires both `LockApp.exe` and `LogonUI.exe` to distinguish real lock from credential popups), WiFi SSID, meeting windows, and webcam status (in that order); `HOME_SSID` is injected by `monitor.js`
 - `host/launch-monitor.vbs.example` — template for the VBScript that launches the monitor silently; copy to `launch-monitor.vbs` and fill in paths
 - `host/On Air sign monitor.xml.example` — template for the Task Scheduler task; copy to `On Air sign monitor.xml`, fill in `DOMAIN\username` and paths, then import via Task Scheduler → Action → Import Task
+- `enclosures/` — 3D print STL files: Pico 2 W case (top+bottom) and NeoPixel ring sign box (top+bottom); designed by the repo owner on Tinkercad; print at 0.2 mm / 20% infill / no supports
