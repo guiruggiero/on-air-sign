@@ -55,8 +55,8 @@
 
         <script>
             var base = location.protocol === "file:" ? "http://192.168.0.209" : "";
-            document.getElementById("logs-link").href = base + "/logs";
-            document.getElementById("errors-link").href = base + "/errors";
+            document.getElementById("logs-link").href = `${base}/logs`;
+            document.getElementById("errors-link").href = `${base}/errors`;
 
             function flash(t) {
                 var m = document.getElementById("msg");
@@ -66,7 +66,7 @@
             }
 
             function send(p) {
-                fetch(base + p)
+                fetch(`${base}${p}`)
                 .then(function (r) {r.ok ? flash("\u2714 Sent") : flash("\u2718 Failed")})
                 .catch(function () {flash("\u2718 Failed")})
             }
@@ -74,21 +74,20 @@
             function fmtUptime(s) {
                 var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
                     m = Math.floor(s % 3600 / 60), sec = s % 60;
-                if (d > 0) return d + "d " + h + "h " + m + "m";
-                if (h > 0) return h + "h " + m + "m " + sec + "s";
-                if (m > 0) return m + "m " + sec + "s";
-                return sec + "s";
+                if (d > 0) return `${d}d ${h}h ${m}m`;
+                if (h > 0) return `${h}h ${m}m ${sec}s`;
+                if (m > 0) return `${m}m ${sec}s`;
+                return `${sec}s`;
             }
 
             function getStats() {
-                fetch(base + "/stats")
+                fetch(`${base}/stats`)
                 .then(function (r) {return r.json()})
                 .then(function (d) {
                     var total = d.mem_free + d.mem_alloc;
                     var pct = Math.round(d.mem_alloc / total * 100);
                     document.getElementById("stats").innerHTML =
-                        "<b>Memory: " + pct + "% used</b> (" + Math.round(d.mem_alloc / 1024) + "/" +
-                            Math.round(total / 1024) + " KB total) \u00b7 <b>Uptime: " + fmtUptime(d.uptime_s) + "</b>";
+                        `<b>Memory: ${pct}% used</b> (${Math.round(d.mem_alloc / 1024)}/${Math.round(total / 1024)} KB total) \u00b7 <b>Uptime: ${fmtUptime(d.uptime_s)}</b>`;
                 })
                 .catch(function () {
                     document.getElementById("stats").textContent = "Stats unavailable";

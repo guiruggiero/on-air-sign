@@ -1,4 +1,4 @@
-# On-Air sign
+# On Air sign
 
 Automated "On Air" sign using a Raspberry Pi Pico 2 W — shows your meeting and webcam status:
 - No meeting → OFF ⚫

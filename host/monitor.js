@@ -31,7 +31,7 @@ function log(msg) {
     console.log(line);
     try {
         trimLog(LOG_PATH);
-        appendFileSync(LOG_PATH, line + "\n");
+        appendFileSync(LOG_PATH, `${line}\n`);
     } catch {}
     return line;
 }
@@ -40,7 +40,7 @@ function logError(msg) {
     const line = log(msg);
     try {
         trimLog(ERR_PATH);
-        appendFileSync(ERR_PATH, line + "\n");
+        appendFileSync(ERR_PATH, `${line}\n`);
     } catch {}
 }
 
@@ -70,7 +70,7 @@ function runPS(encoded, timeout) {
 }
 
 // Load PowerShell script with HOME_SSID, returns "false|false" if not in a meeting, or "true|<cameraInUse>" if in a meeting at home
-const POLL_PS = Buffer.from(`$HomeSSID = '${HOME_SSID}'\n` + readFileSync(new URL("poll.ps1", import.meta.url), "utf-8"), "utf16le").toString("base64");
+const POLL_PS = Buffer.from(`$HomeSSID = "${HOME_SSID}"\n${readFileSync(new URL("poll.ps1", import.meta.url), "utf-8")}`, "utf16le").toString("base64");
 
 // Change sign color
 function callPico(state, onError) {
