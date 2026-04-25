@@ -1,6 +1,4 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# On Air Sign Codebase Reference
 
 Two completely separate components communicate over HTTP on the local network: the Windows host monitor (`host/`) and the MicroPython firmware on the Raspberry Pi Pico 2 W (`pico/`). See [host/CLAUDE.md](host/CLAUDE.md) and [pico/CLAUDE.md](pico/CLAUDE.md) for component-specific architecture and setup details.
 

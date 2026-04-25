@@ -1,6 +1,4 @@
-# host/CLAUDE.md
-
-Component-specific guidance for the Windows host monitor.
+# Host Monitor Reference
 
 ## Running the monitor
 

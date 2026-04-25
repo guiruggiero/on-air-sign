@@ -1,6 +1,4 @@
-# pico/CLAUDE.md
-
-Component-specific guidance for the MicroPython firmware on the Raspberry Pi Pico 2 W.
+# Pico Firmware Reference
 
 ## Deploying to the Pico
 
