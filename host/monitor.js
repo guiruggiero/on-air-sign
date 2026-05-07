@@ -76,7 +76,7 @@ const TOAST_PS = [
     "[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType=WindowsRuntime] > $null",
     "$xml = New-Object Windows.Data.Xml.Dom.XmlDocument",
     "$body = [System.Security.SecurityElement]::Escape($env:TOAST_BODY)",
-    "$xml.LoadXml(\"<toast><visual><binding template='ToastText02'><text id='1'>On Air Sign</text><text id='2'>$body</text></binding></visual></toast>\")",
+    "$xml.LoadXml(\"<toast><visual><binding template='ToastText01'><text id='1'>$body</text></binding></visual></toast>\")",
     "$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)",
     "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('On Air Sign').Show($toast)",
 ].join("\n");
@@ -85,11 +85,11 @@ const TOAST_PS_ENCODED = Buffer.from(TOAST_PS, "utf16le").toString("base64");
 function notifyToast(label) {
     try {
         const child = spawn("powershell.exe", ["-NoProfile", "-EncodedCommand", TOAST_PS_ENCODED], {
-            env: {...process.env, TOAST_BODY: `Sign → ${label}`},
-            detached: true,
-            stdio: "ignore",
+            env: {...process.env, TOAST_BODY: label},
             windowsHide: true,
         });
+        child.stdout.resume();
+        child.stderr.resume();
         child.on("error", (e) => logError(`Toast spawn failed: ${e.message}`));
         child.unref();
     } catch (e) {
