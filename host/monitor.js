@@ -2,7 +2,7 @@
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {statSync, readFileSync, writeFileSync, appendFileSync} from "fs";
-import {execSync} from "child_process";
+import {execSync, spawn} from "child_process";
 import http from "http";
 
 // Logging
@@ -47,6 +47,7 @@ function logError(msg) {
 // Initializations
 const PICO_IP = "192.168.0.209";
 const HOME_SSID = process.env.HOME_SSID;
+const NOTIFY_ON_CHANGE = true;
 const IDLE_POLL_INTERVAL_MS = 15000; // 15 seconds when no meeting
 const ACTIVE_POLL_INTERVAL_MS = 5000; // 5 seconds during a meeting (camera responsiveness)
 let currentState = null;
@@ -69,15 +70,43 @@ function runPS(encoded, timeout) {
     return execSync(`pwsh -NoProfile -EncodedCommand ${encoded}`, {timeout}).toString().trim();
 }
 
+// PowerShell 5.1 required for WinRT toast types
+const TOAST_PS = [
+    "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] > $null",
+    "[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType=WindowsRuntime] > $null",
+    "$xml = New-Object Windows.Data.Xml.Dom.XmlDocument",
+    "$body = [System.Security.SecurityElement]::Escape($env:TOAST_BODY)",
+    "$xml.LoadXml(\"<toast><visual><binding template='ToastText02'><text id='1'>On Air Sign</text><text id='2'>$body</text></binding></visual></toast>\")",
+    "$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)",
+    "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('On Air Sign').Show($toast)",
+].join("\n");
+const TOAST_PS_ENCODED = Buffer.from(TOAST_PS, "utf16le").toString("base64");
+
+function notifyToast(label) {
+    try {
+        const child = spawn("powershell.exe", ["-NoProfile", "-EncodedCommand", TOAST_PS_ENCODED], {
+            env: {...process.env, TOAST_BODY: `Sign → ${label}`},
+            detached: true,
+            stdio: "ignore",
+            windowsHide: true,
+        });
+        child.on("error", (e) => logError(`Toast spawn failed: ${e.message}`));
+        child.unref();
+    } catch (e) {
+        logError(`Toast spawn threw: ${e.message}`);
+    }
+}
+
 // Load PowerShell script with HOME_SSID, returns "false|false" if not in a meeting, or "true|<cameraInUse>" if in a meeting at home
 const POLL_PS = Buffer.from(`$HomeSSID = "${HOME_SSID}"\n${readFileSync(new URL("poll.ps1", import.meta.url), "utf-8")}`, "utf16le").toString("base64");
 
 // Change sign color
-function callPico(state, onError) {
+function callPico(state, onError, isTransition = false) {
     const {endpoint, label} = state;
     const req = http.request({hostname: PICO_IP, port: 80, path: endpoint, method: "GET"}, (res) => {
         res.resume(); // Drain response body to free socket
         log(`Sign → ${label} (HTTP ${res.statusCode})`);
+        if (isTransition && NOTIFY_ON_CHANGE && res.statusCode === 200) notifyToast(label);
     });
     req.setTimeout(3000, () => {
         req.destroy(new Error("Request timed out"));
@@ -111,7 +140,7 @@ function poll() {
         if (currentState !== STATES.OFF && currentState !== null) { // Left a meeting
             const prevState = currentState;
             currentState = STATES.OFF;
-            callPico(STATES.OFF, () => {currentState = prevState;});
+            callPico(STATES.OFF, () => {currentState = prevState;}, true);
         }
         return;
     }
@@ -121,7 +150,7 @@ function poll() {
     if (newState !== currentState) {
         const prevState = currentState;
         currentState = newState;
-        callPico(newState, () => {currentState = prevState});
+        callPico(newState, () => {currentState = prevState}, true);
     } else {
         callPico(newState); // Heartbeat for Pico watchdog
     }

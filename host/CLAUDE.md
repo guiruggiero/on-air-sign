@@ -29,7 +29,8 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host\poll.ps1 }"
 
 `host/monitor.js` is a Node.js process that polls for meeting state and drives the Pico sign over HTTP.
 
-- No npm dependencies; uses only Node.js built-ins (`child_process`, `fs`, `http`, `url`, `path`); requires PowerShell 7+ (`pwsh`)
+- No npm dependencies; uses only Node.js built-ins (`child_process`, `fs`, `http`, `url`, `path`); polling requires PowerShell 7+ (`pwsh`); the optional toast notification path uses Windows PowerShell 5.1 (`powershell.exe`) because `pwsh` cannot resolve WinRT toast types
+- Toast notifications on state changes (controlled by `NOTIFY_ON_CHANGE` flag in `monitor.js`); fires only on HTTP 200 transitions, never on heartbeats, errors, or shutdown
 - Injects `HOME_SSID` into `poll.ps1` at startup and base64-encodes it for `-EncodedCommand`
 - Polls by running the PowerShell script every 15s (idle) or 5s (in meeting); uses chained `setTimeout` so polls don't overlap
 - Sends HTTP GET to Pico on state changes and as heartbeat during active meetings (feeds Pico watchdog)
