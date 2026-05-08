@@ -6,10 +6,9 @@ $ProgressPreference = "SilentlyContinue"
 $isLocked = (Get-Process -Name LockApp -ErrorAction SilentlyContinue) -and (Get-Process -Name LogonUI -ErrorAction SilentlyContinue)
 if ($isLocked) { "false|false"; exit }
 
-# Check WiFi SSID
-$ssidLine = (netsh wlan show interfaces) | Select-String "(?<!\w)SSID\s" | Select-Object -First 1
-$ssid = if ($ssidLine) { ($ssidLine -split ":", 2)[1].Trim() } else { "" }
-if ($ssid -ne $HomeSSID) { "false|false"; exit }
+# Check WiFi SSID - via the Network List Manager, without triggering Windows' location permission
+$onHomeNetwork = [bool](Get-NetConnectionProfile -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $HomeSSID })
+if (-not $onHomeNetwork) { "false|false"; exit }
 
 # Check meeting
 $titles = Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object -ExpandProperty MainWindowTitle
