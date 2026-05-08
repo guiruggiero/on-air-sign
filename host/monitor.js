@@ -5,6 +5,21 @@ import {statSync, readFileSync, writeFileSync, appendFileSync} from "fs";
 import {execSync, spawn} from "child_process";
 import http from "http";
 
+// Initializations
+const PICO_IP = "192.168.0.209";
+const HOME_SSID = process.env.HOME_SSID;
+const NOTIFY_ON_CHANGE = true;
+const IDLE_POLL_INTERVAL_MS = 5000; // 5 seconds when no meeting
+const ACTIVE_POLL_INTERVAL_MS = 5000; // 5 seconds during a meeting (camera responsiveness)
+let currentState = null;
+let shuttingDown = false;
+const STATES = {
+    OFF:    {endpoint: "/off",    label: "OFF ⚫"},
+    YELLOW: {endpoint: "/yellow", label: "YELLOW 🟡"},
+    RED:    {endpoint: "/red",    label: "RED 🔴"},
+};
+const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 // Logging
 const HOST_DIR = dirname(fileURLToPath(import.meta.url));
 const LOG_PATH = join(HOST_DIR, "logs.log");
@@ -43,21 +58,6 @@ function logError(msg) {
         appendFileSync(ERR_PATH, `${line}\n`);
     } catch {}
 }
-
-// Initializations
-const PICO_IP = "192.168.0.209";
-const HOME_SSID = process.env.HOME_SSID;
-const NOTIFY_ON_CHANGE = true;
-const IDLE_POLL_INTERVAL_MS = 15000; // 15 seconds when no meeting
-const ACTIVE_POLL_INTERVAL_MS = 5000; // 5 seconds during a meeting (camera responsiveness)
-let currentState = null;
-let shuttingDown = false;
-const STATES = {
-    OFF:    {endpoint: "/off",    label: "OFF ⚫"},
-    YELLOW: {endpoint: "/yellow", label: "YELLOW 🟡"},
-    RED:    {endpoint: "/red",    label: "RED 🔴"},
-};
-const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Initial check if env variables are set
 if (!HOME_SSID) {
