@@ -11,7 +11,33 @@ $onHomeNetwork = [bool](Get-NetConnectionProfile -ErrorAction SilentlyContinue |
 if (-not $onHomeNetwork) { "false|false"; exit }
 
 # Check meeting
-$titles = Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object -ExpandProperty MainWindowTitle
+# Use EnumWindows to get all visible window titles, not just MainWindowTitle per process.
+# MainWindowTitle only returns one title per process and changes with focus — this causes
+# Slack Huddle's floating window to disappear from the list when Slack loses focus.
+Add-Type @"
+using System;
+using System.Text;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public class WindowEnum {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+    public static List<string> GetTitles() {
+        var list = new List<string>();
+        EnumWindows((hWnd, lParam) => {
+            if (IsWindowVisible(hWnd)) {
+                var sb = new StringBuilder(256);
+                if (GetWindowText(hWnd, sb, 256) > 0) list.Add(sb.ToString());
+            }
+            return true;
+        }, IntPtr.Zero);
+        return list;
+    }
+}
+"@ -ErrorAction SilentlyContinue
+$titles = [WindowEnum]::GetTitles()
 $meetingPatterns = @("Zoom Meeting", "Huddle", "Amazon Chime:", "Meet -", "Meet –", "| Microsoft Teams")
 $inMeeting = $false
 foreach ($title in $titles) {
