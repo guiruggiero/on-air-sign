@@ -2,7 +2,7 @@ secrets.py
 .env
 AGENTS.md
 *.log
-host/launch-monitor.vbs
-host/On Air sign monitor.xml
+host-win/launch-monitor.vbs
+host-win/On Air sign monitor.xml
 host-mac/monitor
 host-mac/com.onairsign.monitor.plist

@@ -29,15 +29,15 @@ Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variab
 ```
 Then run:
 ```powershell
-node host/monitor.js
+node host-win/monitor.js
 ```
 Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `monitor.js` never changes.
 
 ### Autostart
 To run the monitor automatically on login via Windows Task Scheduler:
-1. Copy `host/launch-monitor.vbs.example` → `host/launch-monitor.vbs` and fill in your Node.js path and repo path
-2. Copy `host/On Air sign monitor.xml.example` → `host/On Air sign monitor.xml` and replace `DOMAIN\username`, `DATE`, and the paths in `<Actions>`
-3. Open Task Scheduler → Action → Import Task, and select `host\On Air sign monitor.xml`
+1. Copy `host-win/launch-monitor.vbs.example` → `host-win/launch-monitor.vbs` and fill in your Node.js path and repo path
+2. Copy `host-win/On Air sign monitor.xml.example` → `host-win/On Air sign monitor.xml` and replace `DOMAIN\username`, `DATE`, and the paths in `<Actions>`
+3. Open Task Scheduler → Action → Import Task, and select `host-win\On Air sign monitor.xml`
 
 ---
 

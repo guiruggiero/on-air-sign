@@ -40,13 +40,13 @@ tail -f logs.log
 
 - Screen lock via `CGSessionCopyCurrentDictionary()` (undocumented but stable CoreGraphics export), checking `CGSSessionScreenIsLocked`
 - Home WiFi SSID via `ipconfig getsummary <iface>` (interface name resolved from `networksetup -listallhardwareports`), not CoreWLAN - `CWWiFiClient` requires Location Services authorization even for headless CLI tools
-- Meeting-app detection via `CGWindowListCopyWindowInfo`, matching on-screen window titles against the same pattern list as `host/poll.ps1`; requires the **Screen Recording** permission (see below) or other apps' window titles come back empty
+- Meeting-app detection via `CGWindowListCopyWindowInfo`, matching on-screen window titles against the same pattern list as `host-win/poll.ps1`; requires the **Screen Recording** permission (see below) or other apps' window titles come back empty
 - Camera-in-use via CoreMediaIO's `kCMIODevicePropertyDeviceIsRunningSomewhere` device property - the same public-API technique used by open-source camera-indicator tools
 - Talks to the Pico over **raw POSIX sockets**, not `URLSession`: CFNetwork's App Transport Security blocks plain `http://` loads by default, and a bare `swiftc` binary has no Info.plist to declare an exception
-- Sends HTTP GET to the Pico on state changes and as a heartbeat during active meetings (feeds the Pico's 5-minute watchdog), with the same debounce/rollback-on-failure semantics as `host/monitor.js`
+- Sends HTTP GET to the Pico on state changes and as a heartbeat during active meetings (feeds the Pico's 5-minute watchdog), with the same debounce/rollback-on-failure semantics as `host-win/monitor.js`
 - Notifications on state changes via `osascript -e 'display notification ...'` (no entitlements/bundle ID needed, unlike `UserNotifications`)
 - `SIGINT`/`SIGTERM` turn the sign off before exiting
-- Logs to `host-mac/logs.log` (all events) and `host-mac/errors.log` (errors only); same format and 200KB rotation-keep-newer-half behavior as `host/monitor.js`
+- Logs to `host-mac/logs.log` (all events) and `host-mac/errors.log` (errors only); same format and 200KB rotation-keep-newer-half behavior as `host-win/monitor.js`
 
 ### Required permissions
 

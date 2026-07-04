@@ -46,8 +46,8 @@
   <Actions Context="Author">
     <Exec>
       <Command>wscript.exe</Command>
-      <Arguments>C:\path\to\on-air-sign\host\launch-monitor.vbs</Arguments>
-      <WorkingDirectory>C:\path\to\on-air-sign\host</WorkingDirectory>
+      <Arguments>C:\path\to\on-air-sign\host-win\launch-monitor.vbs</Arguments>
+      <WorkingDirectory>C:\path\to\on-air-sign\host-win</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>
