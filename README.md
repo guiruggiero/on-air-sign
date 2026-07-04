@@ -33,11 +33,30 @@ node host-win/monitor.js
 ```
 Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `monitor.js` never changes.
 
-### Autostart
+### Autostart (Windows)
 To run the monitor automatically on login via Windows Task Scheduler:
 1. Copy `host-win/launch-monitor.vbs.example` → `host-win/launch-monitor.vbs` and fill in your Node.js path and repo path
 2. Copy `host-win/On Air sign monitor.xml.example` → `host-win/On Air sign monitor.xml` and replace `DOMAIN\username`, `DATE`, and the paths in `<Actions>`
 3. Open Task Scheduler → Action → Import Task, and select `host-win\On Air sign monitor.xml`
+
+### Host monitor (macOS)
+Requires Xcode Command Line Tools (for `swiftc`/`codesign`) — no other dependencies. Set the HOME_SSID environment variable and build:
+```sh
+export HOME_SSID="<your_ssid>"
+cd host-mac
+./build.sh
+```
+Then run:
+```sh
+./monitor
+```
+Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `main.swift` never changes. On first run, grant `host-mac/monitor` **Screen Recording** permission in System Settings → Privacy & Security so it can detect meeting-app windows (and Camera permission too, if camera detection doesn't pick up an active call — see `host-mac/CLAUDE.md` for details).
+
+### Autostart (macOS)
+To run the monitor automatically on login via a `launchd` LaunchAgent:
+1. Copy `host-mac/com.onairsign.monitor.plist.example` → `host-mac/com.onairsign.monitor.plist` and fill in the absolute paths and `HOME_SSID`
+2. `cp host-mac/com.onairsign.monitor.plist ~/Library/LaunchAgents/`
+3. `launchctl load -w ~/Library/LaunchAgents/com.onairsign.monitor.plist`
 
 ---
 
