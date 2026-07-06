@@ -22,6 +22,8 @@ Print and assemble the enclosures from `enclosures/` — a snap-fit box for the 
 
 Optionally, upload `pico/onairsign.html` to your personal website for easy access to the dashboard without remembering the IP.
 
+The host monitor comes in two implementations that produce the same outcomes — pick the one matching your computer. Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `monitor.js` never changes.
+
 ### Host monitor (Windows)
 Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variable:
 ```powershell
@@ -29,15 +31,33 @@ Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variab
 ```
 Then run:
 ```powershell
-node host/monitor.js
+node host-win/monitor.js
 ```
-Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `monitor.js` never changes.
 
-### Autostart
+#### Autostart
 To run the monitor automatically on login via Windows Task Scheduler:
-1. Copy `host/launch-monitor.vbs.example` → `host/launch-monitor.vbs` and fill in your Node.js path and repo path
-2. Copy `host/On Air sign monitor.xml.example` → `host/On Air sign monitor.xml` and replace `DOMAIN\username`, `DATE`, and the paths in `<Actions>`
-3. Open Task Scheduler → Action → Import Task, and select `host\On Air sign monitor.xml`
+1. Copy `host-win/launch-monitor.vbs.example` → `host-win/launch-monitor.vbs` and fill in your Node.js path and repo path
+2. Copy `host-win/On Air sign monitor.xml.example` → `host-win/On Air sign monitor.xml` and replace `DOMAIN\username`, `DATE`, and the paths in `<Actions>`
+3. Open Task Scheduler → Action → Import Task, and select `host-win\On Air sign monitor.xml`
+
+### Host monitor (macOS)
+Requires Node.js and the Xcode Command Line Tools (for `swiftc` — usually already installed). Build the native probe once, then run:
+```bash
+cd host-mac
+./build.sh
+export HOME_SSID="<your_ssid>"
+node monitor.js
+```
+On first run, grant these in System Settings → Privacy & Security: **Screen Recording** (so the probe can read meeting-app window titles — without it no meeting is detected) and **Location Services** for your terminal/Node (required by macOS to read the WiFi network name). Camera state needs no permission. See [host-mac/CLAUDE.md](host-mac/CLAUDE.md) for details.
+
+#### Autostart
+To run the monitor automatically on login via launchd:
+1. Copy `host-mac/com.onairsign.monitor.plist.example` → `host-mac/com.onairsign.monitor.plist` and fill in your Node.js path, repo path, and HOME_SSID
+2. Symlink or copy it into `~/Library/LaunchAgents/` and load it:
+   ```bash
+   cp "host-mac/com.onairsign.monitor.plist" ~/Library/LaunchAgents/
+   launchctl load ~/Library/LaunchAgents/com.onairsign.monitor.plist
+   ```
 
 ---
 

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.onairsign.monitor</string>
+
+    <!-- Run node host-mac/monitor.js. Replace <PATH_TO_NODE> and <PATH_TO_REPO>. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string><PATH_TO_NODE></string>
+        <string><PATH_TO_REPO>/host-mac/monitor.js</string>
+    </array>
+
+    <!-- HOME_SSID is required; monitor.js exits without it -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME_SSID</key>
+        <string><YOUR_SSID></string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string><PATH_TO_REPO>/host-mac</string>
+
+    <!-- Start on login. KeepAlive only on a crash (SuccessfulExit=false) — a graceful
+         shutdown (SIGTERM → exit 0, which turns the sign off) must NOT be relaunched,
+         otherwise the sign would come right back on after you stop the monitor. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- monitor.js writes its own logs.log/errors.log; capture stray stdout/stderr too -->
+    <key>StandardOutPath</key>
+    <string><PATH_TO_REPO>/host-mac/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string><PATH_TO_REPO>/host-mac/launchd.err.log</string>
+</dict>
+</plist>
