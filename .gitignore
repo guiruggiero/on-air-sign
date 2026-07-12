@@ -6,3 +6,4 @@ host-win/launch-monitor.vbs
 host-win/On Air sign monitor.xml
 host-mac/com.onairsign.monitor.plist
 host-mac/probe
+.DS_Store
