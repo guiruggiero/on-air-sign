@@ -18,3 +18,7 @@ Separate components communicate over HTTP on the local network: a host monitor a
 
 ## Key files
 - `enclosures/` — 3D print STL files: Pico 2 W case (top+bottom) and NeoPixel ring sign box (top+bottom); designed by the repo owner on Tinkercad; print at 0.2 mm / 20% infill / no supports
+
+## SonarQube Cloud
+
+Project key `guiruggiero_on-air-sign`.
