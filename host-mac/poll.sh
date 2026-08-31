@@ -22,16 +22,16 @@ fi
 # macOS returns it only when the running process holds Location Services permission.
 wifiPort=$(networksetup -listallhardwareports 2>/dev/null | awk '/Wi-Fi|AirPort/{getline; print $2; exit}')
 currentSSID=""
-if [ -n "$wifiPort" ]; then
+if [[ -n "$wifiPort" ]]; then
     currentSSID=$(ipconfig getsummary "$wifiPort" 2>/dev/null | awk -F ' SSID : ' '/ SSID : / {print $2; exit}')
 fi
-if [ "$currentSSID" != "$HOME_SSID" ]; then
+if [[ "$currentSSID" != "$HOME_SSID" ]]; then
     echo "false|false"; exit 0
 fi
 
 # Check meeting + camera via the compiled probe, which prints "<inMeeting>|<cameraInUse>".
 # Without a usable probe there's no way to detect a meeting on macOS, so report OFF.
-if [ -n "$PROBE_BIN" ] && [ -x "$PROBE_BIN" ]; then
+if [[ -n "$PROBE_BIN" ]] && [[ -x "$PROBE_BIN" ]]; then
     "$PROBE_BIN"
 else
     echo "false|false"
