@@ -1,9 +1,9 @@
 // Imports
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
-import {statSync, readFileSync, writeFileSync, appendFileSync} from "fs";
-import {execSync, spawn} from "child_process";
-import http from "http";
+import {statSync, readFileSync, writeFileSync, appendFileSync} from "node:fs";
+import {execSync, spawn} from "node:child_process";
+import http from "node:http";
 
 // Initializations
 const PICO_IP = "192.168.0.209";

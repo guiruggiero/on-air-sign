@@ -28,7 +28,7 @@ fi
 
 # Check meeting + camera via the compiled probe, which prints "<inMeeting>|<cameraInUse>".
 # Without a usable probe there's no way to detect a meeting on macOS, so report OFF.
-if [ -n "$PROBE_BIN" ] && [ -x "$PROBE_BIN" ]; then
+if [[ -n "$PROBE_BIN" ]] && [[ -x "$PROBE_BIN" ]]; then
     "$PROBE_BIN"
 else
     echo "false|false"
