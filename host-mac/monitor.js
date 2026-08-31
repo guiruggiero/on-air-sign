@@ -7,7 +7,6 @@ import http from "http";
 
 // Initializations
 const PICO_IP = "192.168.0.209";
-const HOME_SSID = process.env.HOME_SSID;
 const NOTIFY_ON_CHANGE = true;
 const IDLE_POLL_INTERVAL_MS = 5000; // 5 seconds when no meeting
 const ACTIVE_POLL_INTERVAL_MS = 5000; // 5 seconds during a meeting (camera responsiveness)
@@ -59,12 +58,6 @@ function logError(msg) {
     } catch {}
 }
 
-// Initial check if env variables are set
-if (!HOME_SSID) {
-    logError("HOME_SSID environment variable not set. Terminating");
-    process.exit(1);
-}
-
 // The native probe (meeting-window + camera detection) is compiled once by build.sh, not here:
 // swiftc is usually not on launchd's PATH, so compiling at startup would silently fail on autostart.
 const PROBE_BIN = join(HOST_DIR, "probe");
@@ -87,12 +80,12 @@ function notify(label) {
     }
 }
 
-// Run poll.sh with HOME_SSID and the camera probe path injected via env
+// Run poll.sh with the camera probe path injected via env
 const POLL_SCRIPT = join(HOST_DIR, "poll.sh");
 function runPoll(timeout) {
     return execFileSync("bash", [POLL_SCRIPT], {
         timeout,
-        env: {...process.env, HOME_SSID, PROBE_BIN},
+        env: {...process.env, PROBE_BIN},
     }).toString().trim();
 }
 

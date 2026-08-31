@@ -10,19 +10,33 @@ Works with Zoom, Google Meet, Slack Huddle, Amazon Chime, and Microsoft Teams. O
 ## Setup
 
 ### Pico
-Upload `pico/main.py` and `pico/dashboard.html` to the Pico 2 W using Thonny. Create `pico/secrets.py` on the device:
+Wire the WS2812 NeoPixel ring data line to **GP4**.
+
+Print and assemble the enclosures from `enclosures/` — a snap-fit box for the NeoPixel ring and a case for the Pico 2 W. See [`enclosures/README.md`](enclosures/README.md) for print settings.
+
+The Pico firmware comes in two implementations — pick the one matching your host monitor (see below).
+
+#### Pico (push variant, pairs with the Windows host monitor)
+Upload `pico-push/main.py` and `pico-push/dashboard.html` to the Pico 2 W using Thonny. Create `pico-push/secrets.py` on the device:
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
 WEBREPL_PW = "<webrepl_password>"
 ```
-Wire the WS2812 NeoPixel ring data line to **GP4**.
+Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `host-win/monitor.js` never changes. The Pico runs a local HTTP server and the host pushes state to it directly, so both must be on the same LAN.
 
-Print and assemble the enclosures from `enclosures/` — a snap-fit box for the NeoPixel ring and a case for the Pico 2 W. See [`enclosures/README.md`](enclosures/README.md) for print settings.
+Optionally, upload `pico-push/onairsign.html` to your personal website for easy access to the dashboard without remembering the IP.
 
-Optionally, upload `pico/onairsign.html` to your personal website for easy access to the dashboard without remembering the IP.
-
-The host monitor comes in two implementations that produce the same outcomes — pick the one matching your computer. Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `monitor.js` never changes.
+#### Pico (pull variant, pairs with the macOS host monitor)
+Upload `pico-pull/main.py` to the Pico 2 W using Thonny. Create a feed named `on-air-sign` on [Adafruit IO](https://io.adafruit.com), then create `pico-pull/secrets.py` on the device:
+```python
+SSID = "<wifi_name>"
+PASSWORD = "<wifi_password>"
+WEBREPL_PW = "<webrepl_password>"
+AIO_USERNAME = "<adafruit_io_username>"
+AIO_KEY = "<adafruit_io_key>"
+```
+The Pico polls this feed over HTTPS and drives the sign from its value (`off`/`yellow`/`red`) — no LAN adjacency with the host required, and no inbound connections accepted. `host-mac` writing to the feed automatically is still in progress (see [host-mac/CLAUDE.md](host-mac/CLAUDE.md)); until then you can set the feed's value manually from the Adafruit IO dashboard to test the Pico side.
 
 ### Host monitor (Windows)
 Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variable:

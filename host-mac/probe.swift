@@ -1,6 +1,7 @@
 // Native probe for the macOS host — the two signals that have no reliable
 // permission-free CLI on macOS: meeting-window detection and camera-in-use state.
-// (Lock state and WiFi SSID stay in poll.sh, which needs no compiled code for them.)
+// (Lock state and home-network reachability stay in poll.sh, which needs no compiled
+// code for them — see poll.sh for why SSID reading was dropped in favor of reachability.)
 //
 // Default mode prints "<inMeeting>|<cameraInUse>" (e.g. "true|false"), the same
 // contract poll.sh forwards to monitor.js. Run `--dump-windows` to list every

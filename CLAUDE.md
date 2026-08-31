@@ -1,6 +1,11 @@
 # On Air Sign Codebase Reference
 
-Separate components communicate over HTTP on the local network: a host monitor and the MicroPython firmware on the Raspberry Pi Pico 2 W (`pico/`). The host monitor has two platform-specific implementations that produce the same outcomes — `host-win/` (Windows) and `host-mac/` (macOS). See [host-win/CLAUDE.md](host-win/CLAUDE.md), [host-mac/CLAUDE.md](host-mac/CLAUDE.md), and [pico/CLAUDE.md](pico/CLAUDE.md) for component-specific architecture and setup details.
+Separate components communicate with the MicroPython firmware on the Raspberry Pi Pico 2 W. The host monitor has two platform-specific implementations that produce the same outcomes — `host-win/` (Windows) and `host-mac/` (macOS). The Pico firmware has two architectures, each paired with one host:
+
+- **`pico-push/`** + `host-win/` — the host polls locally, then pushes state to the Pico over HTTP on the local network. Requires the host and Pico on the same LAN.
+- **`pico-pull/`** + `host-mac/` — the host polls locally, then writes state to a cloud feed (Adafruit IO); the Pico polls that feed over the internet and drives the LEDs itself. No LAN adjacency required between host and Pico.
+
+See [host-win/CLAUDE.md](host-win/CLAUDE.md), [host-mac/CLAUDE.md](host-mac/CLAUDE.md), [pico-push/CLAUDE.md](pico-push/CLAUDE.md), and [pico-pull/CLAUDE.md](pico-pull/CLAUDE.md) for component-specific architecture and setup details.
 
 ## Sign states
 
