@@ -44,3 +44,11 @@ WEBREPL_PW = "<webrepl_password>"
 - `pico-push/dashboard.html` — web control panel, served by Pico at `/` and also usable as a local file
 - `pico-push/onairsign.html` — redirect page hosted on a personal website; navigates to the Pico's dashboard so you don't need to remember the IP
 - `pico-push/secrets.py` — gitignored, lives only on the Pico; must contain `SSID`, `PASSWORD`, and `WEBREPL_PW`
+
+## Pending — admin dashboard integration
+
+The `guiruggiero.com/admin.html` service health dashboard wants a live On Air card, currently punted until this firmware work lands.
+
+Two separate pieces, both still open:
+- **`/stats` needs a `state` field.** Track the active color in a variable and expose it as `"state": "off"|"yellow"|"red"` alongside the existing `mem_free`/`mem_alloc`/`uptime_s`.
+- **Mixed content blocks the browser fetch regardless.** The Pico serves plain HTTP on the LAN (`192.168.0.209`) and the admin page is HTTPS — `fetch("http://192.168.0.209/stats")` from that page is blocked as mixed content (a scheme problem, not CORS, so no header on the Pico side fixes it). Top-level navigation still works fine, which is why the dashboard's link-out card and `onairsign.html`'s redirect both work today. Options when picking this back up: keep it link-out only, add an HTTPS proxy running on the home LAN that fetches the Pico server-side, or attempt the fetch and gracefully fall back to links if a browser ever permits it.
