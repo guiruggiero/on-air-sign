@@ -1,4 +1,4 @@
-# On Air Sign Codebase Reference
+# On Air sign Codebase Reference
 
 Separate components communicate with the MicroPython firmware on the Raspberry Pi Pico 2 W. The host monitor has two platform-specific implementations that produce the same outcomes — `host-win/` (Windows) and `host-mac/` (macOS). The Pico firmware has two architectures, each paired with one host:
 

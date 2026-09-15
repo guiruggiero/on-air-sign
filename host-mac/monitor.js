@@ -68,7 +68,7 @@ if (!existsSync(PROBE_BIN)) {
 // Send a macOS notification via osascript (built-in, no dependency)
 function notify(label) {
     try {
-        const child = spawn("osascript", ["-e", `display notification ${JSON.stringify(label)} with title "On Air Sign"`], {
+        const child = spawn("osascript", ["-e", `display notification ${JSON.stringify(label)} with title "On Air sign"`], {
             detached: false,
         });
         child.stdout.resume();

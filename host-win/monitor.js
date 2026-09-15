@@ -78,7 +78,7 @@ const TOAST_PS = [
     "$body = [System.Security.SecurityElement]::Escape($env:TOAST_BODY)",
     "$xml.LoadXml(\"<toast><visual><binding template='ToastText01'><text id='1'>$body</text></binding></visual></toast>\")",
     "$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)",
-    "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('On Air Sign').Show($toast)",
+    "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('On Air sign').Show($toast)",
 ].join("\n");
 const TOAST_PS_ENCODED = Buffer.from(TOAST_PS, "utf16le").toString("base64");
 
