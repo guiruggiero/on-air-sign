@@ -14,7 +14,7 @@ node host-win/monitor.js
 
 ## Autostart via Task Scheduler
 
-The monitor runs on login via Windows Task Scheduler. The real files are gitignored (contain username/SID); use the `.example` files as templates:
+The monitor runs on login via Windows Task Scheduler. The real files are gitignored (they contain username/SID); use the `.example` files as templates:
 
 1. Copy `host-win/launch-monitor.vbs.example` → `host-win/launch-monitor.vbs` and fill in your Node path and repo path
 2. Copy `host-win/On Air sign monitor.xml.example` → `host-win/On Air sign monitor.xml`; edit `DOMAIN\username`, `DATE`, and the paths in `<Arguments>` and `<WorkingDirectory>`
@@ -31,11 +31,11 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host-win\poll.ps1 
 
 `host-win/monitor.js` is a Node.js process that polls for meeting state and drives the Pico sign over HTTP.
 
-- No npm dependencies; uses only Node.js built-ins (`child_process`, `fs`, `http`, `url`, `path`); polling requires PowerShell 7+ (`pwsh`); the optional toast notification path uses Windows PowerShell 5.1 (`powershell.exe`) because `pwsh` cannot resolve WinRT toast types
+- No npm dependencies; uses only Node.js built-ins (`child_process`, `fs`, `http`, `url`, `path`). Polling requires PowerShell 7+ (`pwsh`); the optional toast notification path uses Windows PowerShell 5.1 (`powershell.exe`) because `pwsh` cannot resolve WinRT toast types
 - Toast notifications on state changes (controlled by `NOTIFY_ON_CHANGE` flag in `monitor.js`); fires only on HTTP 200 transitions, never on heartbeats, errors, or shutdown
 - Injects `HOME_SSID` into `poll.ps1` at startup and base64-encodes it for `-EncodedCommand`
 - Polls by running the PowerShell script every 15s (idle) or 5s (in meeting); uses chained `setTimeout` so polls don't overlap
-- Sends HTTP GET to Pico on state changes and as heartbeat during active meetings (feeds Pico watchdog)
+- Sends HTTP GET to the Pico on state changes and as heartbeat during active meetings (feeds the Pico watchdog)
 - `SIGINT`/`SIGTERM` turns the sign off before exiting
 - Logs to `host-win/logs.log` (all events) and `host-win/errors.log` (errors only); timestamps include local timezone; both auto-trim at 200KB keeping the newest half
 
@@ -46,6 +46,7 @@ pwsh -NoProfile -Command "& { `$HomeSSID = '<HOME_SSID>'; & .\host-win\poll.ps1 
 - `HOME_SSID` is injected by `monitor.js` at startup
 
 ## Key files
+
 - `host-win/monitor.js` — host monitor (Node.js ES Modules), loads `poll.ps1` at startup
 - `host-win/poll.ps1` — PowerShell script that detects lock state, WiFi SSID, meeting windows, and webcam status
 - `host-win/launch-monitor.vbs.example` — template for the VBScript that launches the monitor silently; copy to `launch-monitor.vbs` and fill in paths
