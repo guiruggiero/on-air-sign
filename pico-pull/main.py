@@ -212,7 +212,7 @@ def https_get(host, path, headers):
 def fetch_state():
     status, body = https_get(AIO_HOST, AIO_PATH, {"X-AIO-Key": AIO_KEY})
     if status != 200:
-        raise Exception(f"Adafruit IO returned HTTP {status}")
+        raise RuntimeError(f"Adafruit IO returned HTTP {status}")
     data = json.loads(body)
     return data["value"], int(data["created_epoch"])
 
