@@ -14,7 +14,9 @@ import gc
 # Adafruit IO feed over MQTT; the /json topic includes created_at
 ADAFRUIT_IO_HOST = "io.adafruit.com"
 ADAFRUIT_IO_TOPIC = f"{secrets.ADAFRUIT_IO_USERNAME}/feeds/on-air-sign/json"
-STALE_AFTER_S = 300 # 5m; older means the host stopped refreshing it, so OFF
+HEARTBEAT_TOPIC = f"{secrets.ADAFRUIT_IO_USERNAME}/feeds/pico" # Status for the admin card: online if recent
+STALE_AFTER_S = 300 # 5m; older means the host stopped refreshing it, so OFF (a manual "red:60" holds 60m)
+HEARTBEAT_S = 60 # Not on color changes, to stay inside the 30 writes/min limit
 KEEPALIVE_S = 60 # Pinged at half this
 LOOP_MS = 200 # Message check interval
 RECONNECT_S = 10 # Adafruit IO allows 20 attempts/min
@@ -143,23 +145,28 @@ while not sync_ntp():
     time.sleep(RECONNECT_S)
     connect_wifi() # Reconnects if WiFi dropped
 last_ntp_sync = time.ticks_ms()
+boot_time = time.time() - time.ticks_ms() // 1000 # For uptime; ticks_ms wraps after ~12 days, the clock doesn't
 
-# Latest feed value and its UTC write time; stale until the first message
+# Latest feed color, its UTC write time, and how long it holds; stale until the first message
 feed_value = "off"
 feed_created = 0
+feed_hold_s = STALE_AFTER_S
+shown = "off" # For the heartbeat; the ring itself can be green while WiFi reconnects
 
 # /get replies are the record itself; live pushes nest it under "data"
 def on_message(topic, msg):
-    global feed_value, feed_created
+    global feed_value, feed_created, feed_hold_s
     try:
         message = json.loads(msg)
         record = message.get("data", message)
-        if record["value"] not in STATE_MAP:
+        color, _, hold_min = record["value"].partition(":") # "red" from the host, or "red:60" for a manual 60-minute hold
+        if color not in STATE_MAP or (hold_min and not hold_min.isdigit()):
             log_error(f"Unknown feed value: {record['value']}")
             return
         t = record["created_at"] # e.g. "2026-11-02T07:31:51Z" (live pushes add milliseconds)
         feed_created = time.mktime((int(t[0:4]), int(t[5:7]), int(t[8:10]), int(t[11:13]), int(t[14:16]), int(t[17:19]), 0, 0))
-        feed_value = record["value"]
+        feed_value = color
+        feed_hold_s = int(hold_min) * 60 if hold_min else STALE_AFTER_S
     except Exception as e:
         log_error(f"Bad feed message: {e}")
 
@@ -173,8 +180,14 @@ def connect_mqtt():
     mqtt.publish(f"{ADAFRUIT_IO_TOPIC}/get", b"")
     log("Connected to Adafruit IO")
 
+# Heartbeat: the color actually shown, uptime, and free memory (publishing also serves as the keepalive)
+def send_heartbeat():
+    gc.collect()
+    mqtt.publish(HEARTBEAT_TOPIC, json.dumps({"state": shown, "uptime_s": time.time() - boot_time, "mem_free": gc.mem_free()}))
+
 mqtt_connected = False
 last_ping = time.ticks_ms()
+last_heartbeat = time.ticks_ms()
 
 while True:
     # Daily NTP re-sync for clock drift
@@ -190,13 +203,16 @@ while True:
 
         if not mqtt_connected:
             connect_mqtt()
-            gc.collect()
             mqtt_connected = True
-            last_ping = time.ticks_ms()
+            send_heartbeat()
+            last_ping = last_heartbeat = time.ticks_ms()
 
         if mqtt.check_msg() is not None: # Non-blocking; calls on_message
             gc.collect() # Only messages and reconnects allocate
-        if time.ticks_diff(time.ticks_ms(), last_ping) > KEEPALIVE_S * 500:
+        if time.ticks_diff(time.ticks_ms(), last_heartbeat) > HEARTBEAT_S * 1000:
+            send_heartbeat()
+            last_ping = last_heartbeat = time.ticks_ms()
+        elif time.ticks_diff(time.ticks_ms(), last_ping) > KEEPALIVE_S * 500:
             mqtt.ping()
             last_ping = time.ticks_ms()
 
@@ -210,9 +226,10 @@ while True:
         time.sleep(RECONNECT_S)
 
     # Stale means OFF: host offline, OFF (never re-written), or connection down
-    value = feed_value if time.time() - feed_created <= STALE_AFTER_S else "off"
+    value = feed_value if time.time() - feed_created <= feed_hold_s else "off"
     if STATE_MAP[value] != pixel_data[0]:
         log(f"State changed: {value}")
         set_sign(STATE_MAP[value])
+        shown = value
 
     time.sleep_ms(LOOP_MS)

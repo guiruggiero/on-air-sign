@@ -19,8 +19,8 @@ Component details: [mac/host](mac/host/CLAUDE.md), [mac/pico](mac/pico/CLAUDE.md
 
 ## Roadmap
 
-1. Pico status feed (e.g. `on-air-sign-pico`): the Pico writes its displayed state, uptime, and free memory every ~5 minutes, so the admin card can tell whether it's online (reads leave no trace in Adafruit IO)
-2. Live On Air card on the website's admin dashboard (`website/admin.html`, separate repo) — read both feeds over HTTPS (public-read, no key); manual control would need a backend holding the key
+1. Flash the heartbeat + manual-hold firmware and verify the `pico` feed updates every minute
+2. Live On Air card on the website's admin dashboard (`website/admin.html`, separate repo) — read both feeds over HTTPS (public-read, no key): status/uptime/memory from `pico`, requested state from `on-air-sign`. Buttons would write e.g. `red:60` to `on-air-sign`, which needs a backend holding the key; drop the old Dashboard/Logs/Errors links (no server on `mac/pico`)
 
 ## Gotchas
 

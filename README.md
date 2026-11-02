@@ -14,7 +14,7 @@ Wire the WS2812 NeoPixel ring data line to **GP4**. Print and assemble the enclo
 The Mac writes the sign state to an [Adafruit IO](https://io.adafruit.com) feed, and Adafruit IO pushes it to the Pico over MQTT, so the two don't need to share a network.
 
 ### Pico
-Create a feed named `on-air-sign` on Adafruit IO. In Thonny, with the Pico on WiFi, install the `umqtt.simple` package once (Tools → Manage packages), upload `mac/pico/main.py`, and create `secrets.py` on the device:
+Create two feeds on Adafruit IO: `on-air-sign` (the sign state) and `pico` (the Pico's status: shown color, uptime, free memory, every minute). In Thonny, with the Pico on WiFi, install the `umqtt.simple` package once (Tools → Manage packages), upload `mac/pico/main.py`, and create `secrets.py` on the device:
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
@@ -22,7 +22,7 @@ WEBREPL_PW = "<webrepl_password>"
 ADAFRUIT_IO_USERNAME = "<adafruit_io_username>"
 ADAFRUIT_IO_KEY = "<adafruit_io_key>"
 ```
-Setting the feed's value (`off`/`yellow`/`red`) on the Adafruit IO dashboard changes the sign by hand.
+Setting the feed's value (`off`/`yellow`/`red`) on the Adafruit IO dashboard changes the sign by hand for 5 minutes; add a hold in minutes to keep it longer, e.g. `red:60`.
 
 ### Host monitor
 Requires Node.js and the Xcode Command Line Tools (`swiftc`).
