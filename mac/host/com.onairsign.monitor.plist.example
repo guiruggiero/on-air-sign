@@ -5,11 +5,11 @@
     <key>Label</key>
     <string>com.onairsign.monitor</string>
 
-    <!-- Run node host-mac/monitor.js. Replace <PATH_TO_NODE> and <PATH_TO_REPO>. -->
+    <!-- Run node mac/host/monitor.js. Replace <PATH_TO_NODE> and <PATH_TO_REPO>. -->
     <key>ProgramArguments</key>
     <array>
         <string><PATH_TO_NODE></string>
-        <string><PATH_TO_REPO>/host-mac/monitor.js</string>
+        <string><PATH_TO_REPO>/mac/host/monitor.js</string>
     </array>
 
     <!-- HOME_SSID is required; monitor.js exits without it -->
@@ -20,7 +20,7 @@
     </dict>
 
     <key>WorkingDirectory</key>
-    <string><PATH_TO_REPO>/host-mac</string>
+    <string><PATH_TO_REPO>/mac/host</string>
 
     <!-- Start on login. KeepAlive only on a crash (SuccessfulExit=false) — a graceful
          shutdown (SIGTERM → exit 0, which turns the sign off) must NOT be relaunched,
@@ -35,8 +35,8 @@
 
     <!-- monitor.js writes its own logs.log/errors.log; capture stray stdout/stderr too -->
     <key>StandardOutPath</key>
-    <string><PATH_TO_REPO>/host-mac/launchd.out.log</string>
+    <string><PATH_TO_REPO>/mac/host/launchd.out.log</string>
     <key>StandardErrorPath</key>
-    <string><PATH_TO_REPO>/host-mac/launchd.err.log</string>
+    <string><PATH_TO_REPO>/mac/host/launchd.err.log</string>
 </dict>
 </plist>

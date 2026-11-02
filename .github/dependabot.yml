@@ -2,7 +2,7 @@ version: 2
 
 updates:
   - package-ecosystem: npm
-    directory: /host-mac
+    directory: /mac/host
     schedule:
       interval: weekly
       day: saturday

@@ -13,7 +13,7 @@
 import CoreGraphics
 import CoreMediaIO
 
-// Same meeting-window patterns as host-win/poll.ps1 — keep the two lists in sync
+// Same meeting-window patterns as win/host/poll.ps1 — keep the two lists in sync
 let meetingPatterns = ["Zoom Meeting", "Huddle", "Amazon Chime:", "Meet -", "Meet –", "| Microsoft Teams"]
 
 // MARK: - Meeting-window detection

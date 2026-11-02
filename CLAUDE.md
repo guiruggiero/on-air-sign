@@ -1,13 +1,13 @@
 # On Air sign Codebase Reference
 
-Separate components communicate with the MicroPython firmware on the Raspberry Pi Pico 2 W. The host monitor has two platform-specific implementations that produce the same outcomes — `host-win/` (Windows) and `host-mac/` (macOS). The Pico firmware has two architectures, each paired with one host:
+Separate components communicate with the MicroPython firmware on the Raspberry Pi Pico 2 W. The host monitor has two platform-specific implementations that produce the same outcomes — `win/host/` (Windows) and `mac/host/` (macOS). The Pico firmware has two architectures, each paired with one host:
 
 | Pairing | How state travels | Requires |
 |---|---|---|
-| `pico-push/` + `host-win/` | host polls locally, then pushes state to the Pico over HTTP on the local network | host and Pico on the same LAN |
-| `pico-pull/` + `host-mac/` | host polls locally, then writes state to a cloud feed (Adafruit IO); the Pico polls that feed over the internet and drives the LEDs itself | no LAN adjacency between host and Pico |
+| `win/pico/` + `win/host/` | host polls locally, then pushes state to the Pico over HTTP on the local network | host and Pico on the same LAN |
+| `mac/pico/` + `mac/host/` | host polls locally, then writes state to a cloud feed (Adafruit IO); the Pico polls that feed over the internet and drives the LEDs itself | no LAN adjacency between host and Pico |
 
-See [host-win/CLAUDE.md](host-win/CLAUDE.md), [host-mac/CLAUDE.md](host-mac/CLAUDE.md), [pico-push/CLAUDE.md](pico-push/CLAUDE.md), and [pico-pull/CLAUDE.md](pico-pull/CLAUDE.md) for component-specific architecture and setup details.
+See [win/host/CLAUDE.md](win/host/CLAUDE.md), [mac/host/CLAUDE.md](mac/host/CLAUDE.md), [win/pico/CLAUDE.md](win/pico/CLAUDE.md), and [mac/pico/CLAUDE.md](mac/pico/CLAUDE.md) for component-specific architecture and setup details.
 
 ## Sign states
 
@@ -19,9 +19,11 @@ See [host-win/CLAUDE.md](host-win/CLAUDE.md), [host-mac/CLAUDE.md](host-mac/CLAU
 
 ## Gotchas
 
+- **Windows pairing is legacy**: there's no Windows machine available anymore, so `win/` can't be run or tested — active development happens in `mac/`
+
 - **Static IP**: the Pico has a DHCP reservation at `192.168.0.209`
 - **WebREPL**: connect to the Pico remotely at `http://micropython.org/webrepl` using `ws://192.168.0.209:8266` to retrieve logs or update files without USB
-- **One monitor at a time**: run only one host monitor against the Pico at once (`host-win/` on Windows *or* `host-mac/` on macOS) — running both causes duplicate/flapping transitions and heartbeats
+- **One monitor at a time**: run only one host monitor against the Pico at once (`win/host/` on Windows *or* `mac/host/` on macOS) — running both causes duplicate/flapping transitions and heartbeats
 
 ## Key files
 

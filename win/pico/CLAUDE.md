@@ -1,10 +1,10 @@
 # Pico Firmware Reference (push variant)
 
-Pairs with `host-win/`. See [pico-pull/CLAUDE.md](../pico-pull/CLAUDE.md) for the pull variant that pairs with `host-mac/` — the two share the same WiFi/LED/logging code, but differ in how they learn the sign state.
+Pairs with `win/host/`. See [mac/pico/CLAUDE.md](../../mac/pico/CLAUDE.md) for the pull variant that pairs with `mac/host/` — the two share the same WiFi/LED/logging code, but differ in how they learn the sign state.
 
 ## Deploying to the Pico
 
-Upload `main.py` and `dashboard.html` from `pico-push/` to the Pico 2 W using Thonny; `main.py` runs automatically on boot. A `secrets.py` must exist on the Pico (gitignored) with:
+Upload `main.py` and `dashboard.html` from `win/pico/` to the Pico 2 W using Thonny; `main.py` runs automatically on boot. A `secrets.py` must exist on the Pico (gitignored) with:
 
 ```python
 SSID = "<wifi_name>"
@@ -14,7 +14,7 @@ WEBREPL_PW = "<webrepl_password>"
 
 ## Architecture
 
-`pico-push/main.py` is the entire Pico firmware — a single-file MicroPython program that runs an HTTP server and drives the NeoPixel ring.
+`win/pico/main.py` is the entire Pico firmware — a single-file MicroPython program that runs an HTTP server and drives the NeoPixel ring.
 
 ### HTTP server
 
@@ -44,10 +44,10 @@ Logs to `logs.log` and `errors.log` on flash with timestamps (PST via NTP sync, 
 
 ## Key files
 
-- `pico-push/main.py` — entire Pico firmware (single file, MicroPython)
-- `pico-push/dashboard.html` — web control panel, served by the Pico at `/` and also usable as a local file
-- `pico-push/onairsign.html` — redirect page hosted on a personal website; navigates to the Pico's dashboard so you don't need to remember the IP
-- `pico-push/secrets.py` — gitignored, lives only on the Pico; must contain `SSID`, `PASSWORD`, and `WEBREPL_PW`
+- `win/pico/main.py` — entire Pico firmware (single file, MicroPython)
+- `win/pico/dashboard.html` — web control panel, served by the Pico at `/` and also usable as a local file
+- `win/pico/onairsign.html` — redirect page hosted on a personal website; navigates to the Pico's dashboard so you don't need to remember the IP
+- `win/pico/secrets.py` — gitignored, lives only on the Pico; must contain `SSID`, `PASSWORD`, and `WEBREPL_PW`
 
 ## Pending — admin dashboard integration
 

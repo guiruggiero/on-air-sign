@@ -1,5 +1,5 @@
 #!/bin/bash
-# Determines the current sign state on macOS, mirroring host-win/poll.ps1's outcomes.
+# Determines the current sign state on macOS, mirroring win/host/poll.ps1's outcomes.
 # Prints "false|false" when not in a meeting (or locked, or away from home),
 # or "true|<cameraInUse>" when in a meeting on the home network.
 #
@@ -9,7 +9,7 @@
 #
 # monitor.js injects PROBE_BIN (path to the compiled probe) before running this. Run
 # directly with:
-#   PROBE_BIN="$PWD/host-mac/probe" ./host-mac/poll.sh
+#   PROBE_BIN="$PWD/mac/host/probe" ./mac/host/poll.sh
 
 # Check computer lock (meeting shorthand) — locked screen means OFF regardless of open windows
 # CGSSessionScreenIsLocked flips to "Yes" only on a real lock screen

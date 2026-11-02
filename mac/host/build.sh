@@ -12,4 +12,4 @@ swiftc probe.swift -O -o probe -framework CoreGraphics -framework CoreMediaIO
 # Moving the binary to a different path still requires re-granting.
 codesign --force --sign - --identifier com.onairsign.probe probe
 
-echo "Built host-mac/probe"
+echo "Built mac/host/probe"

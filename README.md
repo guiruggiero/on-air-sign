@@ -17,18 +17,18 @@ Print and assemble the enclosures from `enclosures/` — a snap-fit box for the 
 The Pico firmware comes in two implementations — pick the one matching your host monitor (see below).
 
 #### Pico (push variant, pairs with the Windows host monitor)
-Upload `pico-push/main.py` and `pico-push/dashboard.html` to the Pico 2 W using Thonny. Create `pico-push/secrets.py` on the device:
+Upload `win/pico/main.py` and `win/pico/dashboard.html` to the Pico 2 W using Thonny. Create `win/pico/secrets.py` on the device:
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
 WEBREPL_PW = "<webrepl_password>"
 ```
-Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `host-win/monitor.js` never changes. The Pico runs a local HTTP server and the host pushes state to it directly, so both must be on the same LAN.
+Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `win/host/monitor.mjs` never changes. The Pico runs a local HTTP server and the host pushes state to it directly, so both must be on the same LAN.
 
-Optionally, upload `pico-push/onairsign.html` to your personal website for easy access to the dashboard without remembering the IP.
+Optionally, upload `win/pico/onairsign.html` to your personal website for easy access to the dashboard without remembering the IP.
 
 #### Pico (pull variant, pairs with the macOS host monitor)
-Upload `pico-pull/main.py` to the Pico 2 W using Thonny. Create a feed named `on-air-sign` on [Adafruit IO](https://io.adafruit.com), then create `pico-pull/secrets.py` on the device:
+Upload `mac/pico/main.py` to the Pico 2 W using Thonny. Create a feed named `on-air-sign` on [Adafruit IO](https://io.adafruit.com), then create `mac/pico/secrets.py` on the device:
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
@@ -36,7 +36,7 @@ WEBREPL_PW = "<webrepl_password>"
 AIO_USERNAME = "<adafruit_io_username>"
 AIO_KEY = "<adafruit_io_key>"
 ```
-The Pico polls this feed over HTTPS and drives the sign from its value (`off`/`yellow`/`red`) — no LAN adjacency with the host required, and no inbound connections accepted. `host-mac` writing to the feed automatically is still in progress (see [host-mac/CLAUDE.md](host-mac/CLAUDE.md)); until then you can set the feed's value manually from the Adafruit IO dashboard to test the Pico side.
+The Pico polls this feed over HTTPS and drives the sign from its value (`off`/`yellow`/`red`) — no LAN adjacency with the host required, and no inbound connections accepted. `mac/host` writing to the feed automatically is still in progress (see [mac/host/CLAUDE.md](mac/host/CLAUDE.md)); until then you can set the feed's value manually from the Adafruit IO dashboard to test the Pico side.
 
 ### Host monitor (Windows)
 Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variable:
@@ -45,31 +45,31 @@ Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variab
 ```
 Then run:
 ```powershell
-node host-win/monitor.js
+node win/host/monitor.mjs
 ```
 
 #### Autostart
 To run the monitor automatically on login via Windows Task Scheduler:
-1. Copy `host-win/launch-monitor.vbs.example` → `host-win/launch-monitor.vbs` and fill in your Node.js path and repo path
-2. Copy `host-win/On Air sign monitor.xml.example` → `host-win/On Air sign monitor.xml` and replace `DOMAIN\username`, `DATE`, and the paths in `<Actions>`
-3. Open Task Scheduler → Action → Import Task, and select `host-win\On Air sign monitor.xml`
+1. Copy `win/host/launch-monitor.vbs.example` → `win/host/launch-monitor.vbs` and fill in your Node.js path and repo path
+2. Copy `win/host/On Air sign monitor.xml.example` → `win/host/On Air sign monitor.xml` and replace `DOMAIN\username`, `DATE`, and the paths in `<Actions>`
+3. Open Task Scheduler → Action → Import Task, and select `win\host\On Air sign monitor.xml`
 
 ### Host monitor (macOS)
 Requires Node.js and the Xcode Command Line Tools (for `swiftc` — usually already installed). Build the native probe once, then run:
 ```bash
-cd host-mac
+cd mac/host
 ./build.sh
 export HOME_SSID="<your_ssid>"
 node monitor.js
 ```
-On first run, grant these in System Settings → Privacy & Security: **Screen Recording** (so the probe can read meeting-app window titles — without it no meeting is detected) and **Location Services** for your terminal/Node (required by macOS to read the WiFi network name). Camera state needs no permission. See [host-mac/CLAUDE.md](host-mac/CLAUDE.md) for details.
+On first run, grant these in System Settings → Privacy & Security: **Screen Recording** (so the probe can read meeting-app window titles — without it no meeting is detected) and **Location Services** for your terminal/Node (required by macOS to read the WiFi network name). Camera state needs no permission. See [mac/host/CLAUDE.md](mac/host/CLAUDE.md) for details.
 
 #### Autostart
 To run the monitor automatically on login via launchd:
-1. Copy `host-mac/com.onairsign.monitor.plist.example` → `host-mac/com.onairsign.monitor.plist` and fill in your Node.js path, repo path, and HOME_SSID
+1. Copy `mac/host/com.onairsign.monitor.plist.example` → `mac/host/com.onairsign.monitor.plist` and fill in your Node.js path, repo path, and HOME_SSID
 2. Symlink or copy it into `~/Library/LaunchAgents/` and load it:
    ```bash
-   cp "host-mac/com.onairsign.monitor.plist" ~/Library/LaunchAgents/
+   cp "mac/host/com.onairsign.monitor.plist" ~/Library/LaunchAgents/
    launchctl load ~/Library/LaunchAgents/com.onairsign.monitor.plist
    ```
 
