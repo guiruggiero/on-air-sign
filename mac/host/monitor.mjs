@@ -8,7 +8,6 @@ import {execFileSync, execFile} from "node:child_process";
 const NOTIFY_ON_CHANGE = true;
 const POLL_INTERVAL_MS = 5000; // 5 seconds
 const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute; re-send during a meeting, well inside the Pico's 5-minute staleness limit
-const ALIVE_LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const FEED_TIMEOUT_MS = 5000; // 5 seconds
 const STATES = {
     OFF:    {value: "off",    label: "OFF ⚫"},
@@ -103,10 +102,10 @@ function isHome() {
 const PROBE_BIN = join(HOST_DIR, "probe");
 function runProbe() {
     try {
-        return execFileSync(PROBE_BIN, {timeout: 10000, stdio: "pipe"}).toString().trim();
+        return execFileSync(PROBE_BIN, {timeout: 2000, stdio: "pipe"}).toString().trim();
     } catch (e) {
         if (e.code === "ENOENT" || e.code === "EACCES") throw new Error(`Probe at ${PROBE_BIN} is missing or not executable — run ./build.sh`);
-        if (e.code === "ETIMEDOUT") throw new Error("Probe timed out after 10s");
+        if (e.code === "ETIMEDOUT") throw new Error("Probe timed out after 2s");
         if (e.signal) throw e; // Killed by Ctrl-C/shutdown — the caller ignores it
         throw new Error(`Probe failed: ${e.stderr?.toString().trim() || e.message}`);
     }
@@ -192,9 +191,6 @@ async function shutdown() {
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
-
-// Alive log
-setInterval(() => log(`♥ Alive - current state: ${currentState?.label ?? "none"}`), ALIVE_LOG_INTERVAL_MS);
 
 log(`Meeting/webcam monitor started, polling every ${POLL_INTERVAL_MS / 1000}s...`);
 schedulePoll();
