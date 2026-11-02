@@ -19,7 +19,7 @@ Component details: [mac/host](mac/host/CLAUDE.md), [mac/pico](mac/pico/CLAUDE.md
 
 ## Roadmap
 
-1. Live On Air card on the website's admin dashboard (`website/admin.html`, separate repo) — read only the `pico` feed over HTTPS (public-read, no key): online from its timestamp, plus state/uptime/memory (state lags up to 60s; show button presses optimistically). Buttons would write e.g. `red:60` to `on-air-sign`, which needs a backend holding the key; drop the old Dashboard/Logs/Errors links (no server on `mac/pico`)
+1. Admin card buttons: the live card (`website/admin.html`, separate repo) already reads the `pico` feed; OFF/YELLOW/RED buttons would write e.g. `red:60` to `on-air-sign` through a `guiddleware` route that verifies the owner's Firebase sign-in and holds the Adafruit IO key
 
 ## Gotchas
 
