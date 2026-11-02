@@ -40,7 +40,7 @@ function log(msg) {
     const now = new Date();
     const date = now.toLocaleDateString([], {month: "2-digit", day: "2-digit"});
     const time = now.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false});
-    const line = `[${date} ${time} ${TIMEZONE}] ${msg}`;
+    const line = `[${date} ${time} ${TIMEZONE}] ${String(msg).replace(/[\r\n]+/g, " ")}`; // Newlines stripped to avoid log forging
     console.log(line);
     appendLine(LOG_PATH, line);
     return line;
@@ -157,15 +157,19 @@ async function transition(newState) {
 }
 
 // OFF unless home and in a meeting; then RED with the camera on, else YELLOW
+function detectState() {
+    if (!isHome()) return STATES.OFF;
+    const output = runProbe();
+    const match = output.match(/^(true|false)\|(true|false)$/);
+    if (!match) throw new Error(`Unexpected probe output: ${output}`);
+    if (match[1] !== "true") return STATES.OFF;
+    return match[2] === "true" ? STATES.RED : STATES.YELLOW;
+}
+
 function poll() {
-    let newState = STATES.OFF;
+    let newState;
     try {
-        if (isHome()) {
-            const output = runProbe();
-            const match = output.match(/^(true|false)\|(true|false)$/);
-            if (!match) throw new Error(`Unexpected probe output: ${output}`);
-            if (match[1] === "true") newState = match[2] === "true" ? STATES.RED : STATES.YELLOW;
-        }
+        newState = detectState();
         clearError("Polling");
     } catch (e) {
         if (shuttingDown || e.signal) return;
@@ -175,9 +179,9 @@ function poll() {
     }
 
     if (newState !== currentState) { // Transition — the first poll always sends, clearing a sign left on by a crash
-        transition(newState);
+        void transition(newState); // Errors are handled inside sendState
     } else if (newState !== STATES.OFF && Date.now() - lastSentAt >= REFRESH_INTERVAL_MS) { // Keep the value fresh during a meeting
-        sendState(newState);
+        void sendState(newState);
     }
 }
 
