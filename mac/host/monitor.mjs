@@ -6,7 +6,7 @@ import {execFileSync, execFile} from "node:child_process";
 
 // Initializations
 const NOTIFY_ON_CHANGE = true;
-const POLL_INTERVAL_MS = 5000; // 5 seconds
+const POLL_INTERVAL_MS = 3000; // 3 seconds; caps writes at 20/min
 const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute; re-send during a meeting, well inside the Pico's 5-minute staleness limit
 const FEED_TIMEOUT_MS = 5000; // 5 seconds
 const STATES = {

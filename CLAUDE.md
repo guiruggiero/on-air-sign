@@ -4,7 +4,7 @@ A host monitor detects meetings and camera use, and a Raspberry Pi Pico 2 W (Mic
 
 | Pairing | How state travels | Status |
 |---|---|---|
-| `mac/host/` + `mac/pico/` | host writes state to an Adafruit IO feed; the Pico polls it over HTTPS — no LAN adjacency needed | active development |
+| `mac/host/` + `mac/pico/` | host writes state to an Adafruit IO feed over HTTP; the Pico receives it over MQTT — no LAN adjacency needed | active development |
 | `win/host/` + `win/pico/` | host pushes state to the Pico over LAN HTTP | legacy — no Windows machine anymore, so it can't be run or tested |
 
 Component details: [mac/host](mac/host/CLAUDE.md), [mac/pico](mac/pico/CLAUDE.md), [win/host](win/host/CLAUDE.md), [win/pico](win/pico/CLAUDE.md).
@@ -30,7 +30,7 @@ Component details: [mac/host](mac/host/CLAUDE.md), [mac/pico](mac/pico/CLAUDE.md
 
 ## Key files
 
-- `enclosures/` — 3D print STLs: Pico 2 W case and NeoPixel ring sign box; designed by the repo owner on Tinkercad; print at 0.2 mm / 20% infill / no supports
+- `enclosures/` — 3D print STLs: Pico 2 W case and NeoPixel ring sign box, designed by the repo owner on Tinkercad; print settings in `enclosures/README.md`
 
 ## SonarQube Cloud
 

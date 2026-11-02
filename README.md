@@ -11,16 +11,16 @@ Works with Zoom, Google Meet, Slack Huddle, Webex, and Microsoft Teams on macOS 
 Wire the WS2812 NeoPixel ring data line to **GP4**. Print and assemble the enclosures from `enclosures/` — a snap-fit box for the NeoPixel ring and a case for the Pico 2 W (print settings in [`enclosures/README.md`](enclosures/README.md)).
 
 ## Setup (macOS)
-The Mac writes the sign state to an [Adafruit IO](https://io.adafruit.com) feed and the Pico reads it over HTTPS, so the two don't need to share a network.
+The Mac writes the sign state to an [Adafruit IO](https://io.adafruit.com) feed, and Adafruit IO pushes it to the Pico over MQTT, so the two don't need to share a network.
 
 ### Pico
-Create a feed named `on-air-sign` on Adafruit IO. Upload `mac/pico/main.py` to the Pico with Thonny, and create `secrets.py` on the device:
+Create a feed named `on-air-sign` on Adafruit IO. In Thonny, with the Pico on WiFi, install the `umqtt.simple` package once (Tools → Manage packages), upload `mac/pico/main.py`, and create `secrets.py` on the device:
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
 WEBREPL_PW = "<webrepl_password>"
-AIO_USERNAME = "<adafruit_io_username>"
-AIO_KEY = "<adafruit_io_key>"
+ADAFRUIT_IO_USERNAME = "<adafruit_io_username>"
+ADAFRUIT_IO_KEY = "<adafruit_io_key>"
 ```
 Setting the feed's value (`off`/`yellow`/`red`) on the Adafruit IO dashboard changes the sign by hand.
 

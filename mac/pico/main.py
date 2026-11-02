@@ -1,37 +1,32 @@
 # Imports
 import secrets
-import time
 import os
+import time
 import rp2
 import machine
 import array
 import network
-import socket
-import ssl
 import json
+from umqtt.simple import MQTTClient
 import gc
 
 # Initializations
-SSID = secrets.SSID
-PASSWORD = secrets.PASSWORD
-WEBREPL_PW = secrets.WEBREPL_PW
-AIO_USERNAME = secrets.AIO_USERNAME
-AIO_KEY = secrets.AIO_KEY
-
-# Adafruit IO feed ("red", "yellow", or "off")
-AIO_HOST = "io.adafruit.com"
-AIO_FEED = "on-air-sign"
-AIO_PATH = f"/api/v2/{AIO_USERNAME}/feeds/{AIO_FEED}/data/last"
-POLL_INTERVAL_MS = 3_000 # 3s
-WATCHDOG_TIMEOUT_MS = 300_000 # 5m; turn off if feed unreachable or stale info
-UNIX_EPOCH_OFFSET = 946_684_800 # seconds between Adafruit IO's created_epoch and MicroPython's time.time() epoch
+# Adafruit IO feed over MQTT; the /json topic includes created_at
+ADAFRUIT_IO_HOST = "io.adafruit.com"
+ADAFRUIT_IO_TOPIC = f"{secrets.ADAFRUIT_IO_USERNAME}/feeds/on-air-sign/json"
+STALE_AFTER_S = 300 # 5m; older means the host stopped refreshing it, so OFF
+KEEPALIVE_S = 60 # Pinged at half this
+LOOP_MS = 200 # Message check interval
+RECONNECT_S = 10 # Adafruit IO allows 20 attempts/min
+NTP_SYNC_INTERVAL = 24 * 60 * 60 * 1000 # 24 hours
 
 # Persistent logging to flash
 LOG_PATH = "logs.log"
 ERR_PATH = "errors.log"
 LOG_MAX_BYTES = 20_000
 
-def trim_log(path):
+# Append a line, trimming to the newest half past LOG_MAX_BYTES
+def append_line(path, line):
     try:
         size = os.stat(path)[6]
         if size > LOG_MAX_BYTES:
@@ -42,45 +37,33 @@ def trim_log(path):
             with open(path, "w") as f:
                 f.write(keep)
     except OSError:
-        pass
+        pass # No file yet
+    try:
+        with open(path, "a") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass # Logging must never crash the firmware
 
 def log(msg):
     t = time.localtime(time.time() - 8 * 3600)
     line = f"[{t[1]:02}-{t[2]:02} {t[3]:02}:{t[4]:02}:{t[5]:02}] {msg}"
     print(line)
-    try:
-        trim_log(LOG_PATH)
-        with open(LOG_PATH, "a") as f:
-            f.write(line + "\n")
-    except Exception:
-        pass
+    append_line(LOG_PATH, line)
     return line
 
 def log_error(msg):
-    line = log(msg)
-    try:
-        trim_log(ERR_PATH)
-        with open(ERR_PATH, "a") as f:
-            f.write(line + "\n")
-    except Exception:
-        pass
+    append_line(ERR_PATH, log(msg))
 
 # GRB values (brightness-adjusted, GRB byte order for WS2812)
 BRIGHTNESS = 0.4  # 0.0 (off) to 1.0 (full brightness)
 def _to_grb(r, g, b):
     return (int(g * BRIGHTNESS) << 16) | (int(r * BRIGHTNESS) << 8) | int(b * BRIGHTNESS)
 GRB_OFF    = _to_grb(0, 0, 0)
-GRB_YELLOW = _to_grb(204, 153, 0)
-GRB_RED    = _to_grb(255, 0, 0)
 GRB_GREEN  = _to_grb(0, 255, 0)
-
 STATE_MAP = {
-    "off": GRB_OFF,
-    "o": GRB_OFF,
-    "yellow": GRB_YELLOW,
-    "y": GRB_YELLOW,
-    "red": GRB_RED,
-    "r": GRB_RED,
+    "off":    GRB_OFF,
+    "yellow": _to_grb(204, 153, 0),
+    "red":    _to_grb(255, 0, 0),
 }
 
 # PIO NeoPixel driver for Raspberry Pi Pico 2
@@ -108,23 +91,25 @@ def set_sign(grb):
     for i in range(NUM_LEDS):
         pixel_data[i] = grb
     sm.put(pixel_data, 8) # Send to PIO
-    time.sleep_ms(10) # Brief settle time to ensure the PIO FIFO buffer is cleared
+    time.sleep_ms(10) # Let the PIO FIFO drain
 
-# Sync local clock to NTP time
+# Sync local clock to NTP time (UTC)
 def sync_ntp():
     try:
         import ntptime
         ntptime.settime()
         log("NTP time synced")
-    except Exception:
-        log_error("NTP sync failed")
+        return True
+    except Exception as e:
+        log_error(f"NTP sync failed: {e}")
+        return False
 
 # Connect to WiFi
 wlan = network.WLAN(network.STA_IF)
-def connect_wifi(initial=False):
+def connect_wifi(initial = False):
     wlan.active(True)
     if not wlan.isconnected():
-        wlan.connect(SSID, PASSWORD)
+        wlan.connect(secrets.SSID, secrets.PASSWORD)
         log("Connecting to WiFi...")
         on = False
         for _ in range(40): # 20s timeout
@@ -138,94 +123,61 @@ def connect_wifi(initial=False):
             log_error("WiFi connection failed, resetting...")
             machine.reset()
 
-    ip = wlan.ifconfig()[0]
-    log(f"Connected! IP: {ip}")
-    sync_ntp()
+    log(f"Connected! IP: {wlan.ifconfig()[0]}")
     if initial:
         set_sign(GRB_GREEN) # Solid green on first boot
         time.sleep(3)
         set_sign(GRB_OFF)
-    return ip
 
-ip = connect_wifi(initial=True)
+connect_wifi(initial = True)
 
 # WebREPL for updating files over WiFi
 try:
     import webrepl
-    webrepl.start(password = WEBREPL_PW) # Update via WiFi on http://micropython.org/webrepl with ws://<PICO_IP>:8266
+    webrepl.start(password = secrets.WEBREPL_PW) # micropython.org/webrepl, ws://<PICO_IP>:8266
 except Exception:
     log_error("WebREPL not available")
 
-# Dechunk an HTTP/1.1 chunked-transfer-encoded body
-def dechunk(data):
-    out = b""
-    while data:
-        size_end = data.index(b"\r\n")
-        size = int(data[:size_end], 16)
-        if size == 0:
-            break
-        chunk_start = size_end + 2
-        out += data[chunk_start:chunk_start + size]
-        data = data[chunk_start + size + 2:] # Skip the chunk's trailing \r\n
-    return out
-
-# Minimal HTTPS GET; reads until the server closes the connection
-def https_get(host, path, headers):
-    addr = socket.getaddrinfo(host, 443)[0][-1]
-    raw = socket.socket()
-    raw.settimeout(8.0)
-    raw.connect(addr)
-    s = ssl.wrap_socket(raw, server_hostname=host)
-    try:
-        req_lines = [f"GET {path} HTTP/1.1", f"Host: {host}", "Connection: close"]
-        for k, v in headers.items():
-            req_lines.append(f"{k}: {v}")
-        req_lines.append("\r\n")
-        s.write("\r\n".join(req_lines).encode())
-
-        data = b""
-        while True:
-            chunk = s.read(1024)
-            if not chunk:
-                break
-            data += chunk
-    finally:
-        s.close()
-
-    header_end = data.index(b"\r\n\r\n")
-    header_text = data[:header_end].decode()
-    body = data[header_end + 4:]
-
-    status_code = int(header_text.split("\r\n", 1)[0].split(" ")[1])
-    resp_headers = {}
-    for line in header_text.split("\r\n")[1:]:
-        if ":" in line:
-            k, v = line.split(":", 1)
-            resp_headers[k.strip().lower()] = v.strip()
-
-    if resp_headers.get("transfer-encoding") == "chunked":
-        body = dechunk(body)
-
-    return status_code, body
-
-# Fetch current state and last update time from Adafruit IO
-def fetch_state():
-    status, body = https_get(AIO_HOST, AIO_PATH, {"X-AIO-Key": AIO_KEY})
-    if status != 200:
-        raise RuntimeError(f"Adafruit IO returned HTTP {status}")
-    data = json.loads(body)
-    return data["value"], int(data["created_epoch"])
-
-log(f"Polling Adafruit IO every {POLL_INTERVAL_MS // 1000}s")
-last_fresh_time = time.ticks_ms()
+# Staleness needs real time, so wait for the first sync
+while not sync_ntp():
+    time.sleep(RECONNECT_S)
+    connect_wifi() # Reconnects if WiFi dropped
 last_ntp_sync = time.ticks_ms()
-NTP_SYNC_INTERVAL = 24 * 60 * 60 * 1000 # 24 hours
-STALE_MSG_LOGGED = False
+
+# Latest feed value and its UTC write time; stale until the first message
+feed_value = "off"
+feed_created = 0
+
+# /get replies are the record itself; live pushes nest it under "data"
+def on_message(topic, msg):
+    global feed_value, feed_created
+    try:
+        message = json.loads(msg)
+        record = message.get("data", message)
+        if record["value"] not in STATE_MAP:
+            log_error(f"Unknown feed value: {record['value']}")
+            return
+        t = record["created_at"] # e.g. "2026-11-02T07:31:51Z" (live pushes add milliseconds)
+        feed_created = time.mktime((int(t[0:4]), int(t[5:7]), int(t[8:10]), int(t[11:13]), int(t[14:16]), int(t[17:19]), 0, 0))
+        feed_value = record["value"]
+    except Exception as e:
+        log_error(f"Bad feed message: {e}")
+
+# TLS connection; /get asks for the current value (counts as 1 data point)
+mqtt = MQTTClient("on-air-sign-pico", ADAFRUIT_IO_HOST, user = secrets.ADAFRUIT_IO_USERNAME, password = secrets.ADAFRUIT_IO_KEY,
+                  keepalive = KEEPALIVE_S, ssl = True, ssl_params = {"server_hostname": ADAFRUIT_IO_HOST})
+mqtt.set_callback(on_message)
+def connect_mqtt():
+    mqtt.connect()
+    mqtt.subscribe(ADAFRUIT_IO_TOPIC)
+    mqtt.publish(f"{ADAFRUIT_IO_TOPIC}/get", b"")
+    log("Connected to Adafruit IO")
+
+mqtt_connected = False
+last_ping = time.ticks_ms()
 
 while True:
-    gc.collect() # Periodically clean up memory
-
-    # Periodic NTP re-sync to correct clock drift
+    # Daily NTP re-sync for clock drift
     if time.ticks_diff(time.ticks_ms(), last_ntp_sync) > NTP_SYNC_INTERVAL:
         sync_ntp()
         last_ntp_sync = time.ticks_ms()
@@ -233,31 +185,34 @@ while True:
     try:
         if not wlan.isconnected():
             log_error("WiFi lost, reconnecting...")
+            mqtt_connected = False
             connect_wifi()
 
-        value, created_epoch = fetch_state()
-        age_s = (time.time() + UNIX_EPOCH_OFFSET) - created_epoch
+        if not mqtt_connected:
+            connect_mqtt()
+            gc.collect()
+            mqtt_connected = True
+            last_ping = time.ticks_ms()
 
-        if age_s <= WATCHDOG_TIMEOUT_MS // 1000:
-            last_fresh_time = time.ticks_ms()
-            STALE_MSG_LOGGED = False
-
-            grb = STATE_MAP.get(value)
-            if grb is None:
-                log_error(f"Unknown feed value: {value}")
-            elif grb != pixel_data[0]:
-                log(f"State changed: {value}")
-                set_sign(grb)
-        elif not STALE_MSG_LOGGED:
-            log(f"Feed value is stale ({age_s}s old), ignoring until it updates")
-            STALE_MSG_LOGGED = True
+        if mqtt.check_msg() is not None: # Non-blocking; calls on_message
+            gc.collect() # Only messages and reconnects allocate
+        if time.ticks_diff(time.ticks_ms(), last_ping) > KEEPALIVE_S * 500:
+            mqtt.ping()
+            last_ping = time.ticks_ms()
 
     except Exception as e:
-        log_error(f"Poll failed: {e}")
+        log_error(f"MQTT error, reconnecting in {RECONNECT_S}s: {e}")
+        mqtt_connected = False
+        try:
+            mqtt.sock.close()
+        except Exception:
+            pass
+        time.sleep(RECONNECT_S)
 
-    # Watchdog: turn off sign if feed unreachable or stale info
-    if pixel_data[0] != GRB_OFF and time.ticks_diff(time.ticks_ms(), last_fresh_time) > WATCHDOG_TIMEOUT_MS:
-        log("No fresh feed value in 5 minutes, turning off sign")
-        set_sign(GRB_OFF)
+    # Stale means OFF: host offline, OFF (never re-written), or connection down
+    value = feed_value if time.time() - feed_created <= STALE_AFTER_S else "off"
+    if STATE_MAP[value] != pixel_data[0]:
+        log(f"State changed: {value}")
+        set_sign(STATE_MAP[value])
 
-    time.sleep_ms(POLL_INTERVAL_MS)
+    time.sleep_ms(LOOP_MS)

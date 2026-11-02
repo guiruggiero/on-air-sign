@@ -1,31 +1,32 @@
-# Pico Firmware Reference (pull variant)
+# Pico Firmware Reference (MQTT variant)
 
-Pairs with `mac/host/`. `main.py` is the entire firmware: a single-file MicroPython program, no external libraries, that polls an Adafruit IO feed and drives the NeoPixel ring. It runs no server and only makes outbound requests, so it works behind any network/NAT.
+Pairs with `mac/host/`. `main.py` is the entire firmware: a single-file MicroPython program that receives the Adafruit IO feed over MQTT and drives the NeoPixel ring. Its only dependency is `umqtt.simple` (micropython-lib, not bundled in the firmware). Outbound connections only, so it works behind any NAT.
 
 ## Deploying
 
-Upload `main.py` with Thonny (runs on boot). Create `secrets.py` on the Pico (gitignored):
+1. With the Pico on WiFi, install the MQTT client once (it lives in `/lib` and survives `main.py` updates): Thonny → Tools → Manage packages → `umqtt.simple`, or in the REPL `import mip; mip.install("umqtt.simple")`
+2. Upload `main.py` with Thonny (runs on boot)
+3. Create `secrets.py` on the Pico (gitignored):
 
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
 WEBREPL_PW = "<webrepl_password>"
-AIO_USERNAME = "<adafruit_io_username>"
-AIO_KEY = "<adafruit_io_key>"
+ADAFRUIT_IO_USERNAME = "<adafruit_io_username>"
+ADAFRUIT_IO_KEY = "<adafruit_io_key>"
 ```
 
-`mac/host` writes the feed; setting its value by hand on the Adafruit IO dashboard works too (the Pico can't tell the two apart), which makes the dashboard a manual override.
+`mac/host` writes the feed over HTTP; setting its value by hand on the Adafruit IO dashboard works too (the Pico can't tell the two apart), which makes the dashboard a manual override.
 
 ## Architecture
 
-- **Feed polling** — every 3s, `GET /api/v2/{username}/feeds/on-air-sign/data/last` on `io.adafruit.com` with the `X-AIO-Key` header. HTTPS is done by hand (raw `socket` + `ssl`, manual chunked decoding)
-- **Values** — `"off"`, `"yellow"`, or `"red"`; anything else is logged and ignored (sign holds its state)
-- **Staleness + watchdog** — a datapoint whose `created_epoch` is older than 5 minutes (vs. the NTP-synced clock) is ignored, and the sign turns off if no fresh value arrives for 5 minutes. Covers Adafruit IO outages, Pico WiFi loss, and a host that went offline while the feed still says `"red"`. `mac/host` re-writes the value every 60s during a meeting to stay fresh
+- **MQTT** — one TLS connection to `io.adafruit.com:8883`, subscribed to `{username}/feeds/on-air-sign/json`. HTTP writes are pushed to it immediately. On every connect it publishes to `…/json/get` for the current value (1 data point; the 30/min limit only counts publishes)
+- **Message shapes** — `/get` replies are the data record (`value`, `created_at`); live pushes are a feed object with the record under `data` (`created_at` with milliseconds). `on_message` handles both; unknown values and malformed messages are logged and ignored
+- **Staleness** — `created_at` (UTC) becomes a timestamp via `time.mktime`, on the same UTC clock `ntptime` sets. A value older than 5 minutes shows as OFF: the host went offline, or it's OFF (never re-written; YELLOW/RED are every 60s). A dropped connection means no new values, so this also covers Adafruit IO or WiFi outages — no separate watchdog
+- **Connection** — checked every 200ms (`check_msg`, non-blocking), pinged every 30s (60s keepalive). On errors it waits 10s and reconnects (Adafruit IO allows 20 attempts/min; only rejected subscribes/publishes cause bans)
+- **Clock** — at boot, NTP is retried every 10s until it succeeds (staleness needs real time; the sign stays OFF until then), then re-synced daily
 - **LEDs** — 12-LED WS2812 ring on **GP4** via PIO (8 MHz, GRB)
-- **WiFi** — blinks green while connecting, solid green 3s on first boot, auto-reconnects; resets if the first connection fails after 20s
-- **Logging** — `logs.log`/`errors.log` on flash (PST via NTP, re-synced every 24h, trimmed at 20KB); read via WebREPL (no HTTP endpoints)
+- **WiFi** — blinks green while connecting, solid green 3s on first boot, auto-reconnects; resets the Pico if any connection attempt fails after 20s
+- **Logging** — `logs.log`/`errors.log` on flash (PST via NTP, trimmed at 20KB); read via WebREPL (no HTTP endpoints)
 
-## Key files
-
-- `mac/pico/main.py` — entire firmware
-- `mac/pico/secrets.py` — gitignored, lives only on the Pico
+Accepted: TLS doesn't verify Adafruit IO's certificate (MicroPython default), and log times are fixed PST (an hour off during daylight saving time).
