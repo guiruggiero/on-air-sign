@@ -1,13 +1,13 @@
 # On Air sign Codebase Reference
 
-Separate components communicate with the MicroPython firmware on the Raspberry Pi Pico 2 W. The host monitor has two platform-specific implementations that produce the same outcomes — `win/host/` (Windows) and `mac/host/` (macOS). The Pico firmware has two architectures, each paired with one host:
+A host monitor detects meetings and camera use, and a Raspberry Pi Pico 2 W (MicroPython) lights a NeoPixel ring to match. Two pairings exist:
 
-| Pairing | How state travels | Requires |
+| Pairing | How state travels | Status |
 |---|---|---|
-| `win/pico/` + `win/host/` | host polls locally, then pushes state to the Pico over HTTP on the local network | host and Pico on the same LAN |
-| `mac/pico/` + `mac/host/` | host polls locally, then writes state to a cloud feed (Adafruit IO); the Pico polls that feed over the internet and drives the LEDs itself | no LAN adjacency between host and Pico |
+| `mac/host/` + `mac/pico/` | host writes state to an Adafruit IO feed; the Pico polls it over HTTPS — no LAN adjacency needed | active development |
+| `win/host/` + `win/pico/` | host pushes state to the Pico over LAN HTTP | legacy — no Windows machine anymore, so it can't be run or tested |
 
-See [win/host/CLAUDE.md](win/host/CLAUDE.md), [mac/host/CLAUDE.md](mac/host/CLAUDE.md), [win/pico/CLAUDE.md](win/pico/CLAUDE.md), and [mac/pico/CLAUDE.md](mac/pico/CLAUDE.md) for component-specific architecture and setup details.
+Component details: [mac/host](mac/host/CLAUDE.md), [mac/pico](mac/pico/CLAUDE.md), [win/host](win/host/CLAUDE.md), [win/pico](win/pico/CLAUDE.md).
 
 ## Sign states
 
@@ -17,17 +17,19 @@ See [win/host/CLAUDE.md](win/host/CLAUDE.md), [mac/host/CLAUDE.md](mac/host/CLAU
 | YELLOW | Meeting active, camera off |
 | RED    | Meeting active, camera on  |
 
+## Roadmap
+
+1. `mac/host/monitor.mjs` writes state to the Adafruit IO feed instead of the Pico's LAN IP
+2. Live On Air card on the website's admin dashboard (`website/admin.html`, separate repo) — read the feed over HTTPS (public-read feed, no key); manual control would need a backend holding the key
+
 ## Gotchas
 
-- **Windows pairing is legacy**: there's no Windows machine available anymore, so `win/` can't be run or tested — active development happens in `mac/`
-
-- **Static IP**: the Pico has a DHCP reservation at `192.168.0.209`
-- **WebREPL**: connect to the Pico remotely at `http://micropython.org/webrepl` using `ws://192.168.0.209:8266` to retrieve logs or update files without USB
-- **One monitor at a time**: run only one host monitor against the Pico at once (`win/host/` on Windows *or* `mac/host/` on macOS) — running both causes duplicate/flapping transitions and heartbeats
+- **Pico IP**: DHCP reservation at `192.168.0.209`
+- **WebREPL**: `http://micropython.org/webrepl` with `ws://192.168.0.209:8266` to read logs or update files without USB
 
 ## Key files
 
-- `enclosures/` — 3D print STL files: Pico 2 W case (top+bottom) and NeoPixel ring sign box (top+bottom); designed by the repo owner on Tinkercad; print at 0.2 mm / 20% infill / no supports
+- `enclosures/` — 3D print STLs: Pico 2 W case and NeoPixel ring sign box; designed by the repo owner on Tinkercad; print at 0.2 mm / 20% infill / no supports
 
 ## SonarQube Cloud
 

@@ -1,6 +1,5 @@
 secrets.py
 .env
-AGENTS.md
 *.log
 win/host/launch-monitor.vbs
 win/host/On Air sign monitor.xml

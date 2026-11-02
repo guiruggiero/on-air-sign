@@ -1,80 +1,71 @@
-// Native probe for the macOS host — the two signals that have no reliable
-// permission-free CLI on macOS: meeting-window detection and camera-in-use state.
-// (Lock state and home-network reachability stay in poll.sh, which needs no compiled
-// code for them — see poll.sh for why SSID reading was dropped in favor of reachability.)
-//
-// Default mode prints "<inMeeting>|<cameraInUse>" (e.g. "true|false"), the same
-// contract poll.sh forwards to monitor.js. Run `--dump-windows` to list every
-// on-screen window's owner and title — use it to confirm the exact title strings
-// meeting apps use on this Mac and update `meetingPatterns` below if needed.
-//
-// Compiled to `probe` by build.sh; not run directly by monitor.js.
+// Detects lock state, meeting windows, and camera use for monitor.mjs. Prints "<inMeeting>|<cameraInUse>";
+// `--dump-windows` lists every window's owner and title, for tuning isMeetingWindow
 
 import CoreGraphics
 import CoreMediaIO
 
-// Same meeting-window patterns as win/host/poll.ps1 — keep the two lists in sync
-let meetingPatterns = ["Zoom Meeting", "Huddle", "Amazon Chime:", "Meet -", "Meet –", "| Microsoft Teams"]
+// MARK: - Lock detection
+
+// Read from the login session; needs no permission
+func isScreenLocked() -> Bool {
+    let session = CGSessionCopyCurrentDictionary() as? [String: Any]
+    return session?["CGSSessionScreenIsLocked"] as? Bool ?? false
+}
 
 // MARK: - Meeting-window detection
 
-// Titles of all on-screen windows. Uses CGWindowListCopyWindowInfo (fast, in-process),
-// the macOS analog of Windows' EnumWindows — sees meeting windows regardless of focus.
-// Requires the Screen Recording permission, or other apps' titles come back empty.
-func onScreenWindows() -> [(owner: String, title: String)] {
-    guard let windowList = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
-        return []
-    }
-    return windowList.compactMap { info in
+// Every window, including minimized and hidden ones; other apps' titles are empty without Screen Recording
+func allWindows() -> [(owner: String, title: String)] {
+    let windows = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+    return windows.compactMap { info in
         guard let title = info[kCGWindowName as String] as? String, !title.isEmpty else { return nil }
-        let owner = info[kCGWindowOwnerName as String] as? String ?? "?"
-        return (owner, title)
+        return (info[kCGWindowOwnerName as String] as? String ?? "?", title)
+    }
+}
+
+// Per-app meeting rules, confirmed with `--dump-windows` on real calls. Searching all windows (not just
+// on-screen ones) catches minimized meetings; the Zoom, Slack, and Meet windows disappear when the meeting ends
+func isMeetingWindow(owner: String, title: String) -> Bool {
+    switch owner {
+    case "Zoom": return title.contains("Zoom Meeting")
+    case "Slack": return title.contains("[Main]") // Slack tags its main window this way only while a huddle is open
+    case "Google Chrome": return title.hasPrefix("Meet - ") // Meet tab, or its floating window when another tab is active
+    case "Webex", "Microsoft Teams": return true // Only ever opened for meetings, so running means in a meeting
+    default: return false
     }
 }
 
 func isInMeeting() -> Bool {
-    let titles = onScreenWindows().map { $0.title }
-    return titles.contains { title in meetingPatterns.contains { title.contains($0) } }
+    allWindows().contains { isMeetingWindow(owner: $0.owner, title: $0.title) }
 }
 
 // MARK: - Camera-in-use detection
 
-// Enumerate all CoreMediaIO devices (cameras)
-func cameraDevices() -> [CMIOObjectID] {
-    var address = CMIOObjectPropertyAddress(
-        mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices),
+// Global-scope CoreMediaIO property address
+func cmioAddress(_ selector: Int) -> CMIOObjectPropertyAddress {
+    CMIOObjectPropertyAddress(
+        mSelector: CMIOObjectPropertySelector(selector),
         mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
         mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+}
 
-    var dataSize: UInt32 = 0
-    guard CMIOObjectGetPropertyDataSize(CMIOObjectID(kCMIOObjectSystemObject), &address, 0, nil, &dataSize) == kCMIOHardwareNoError,
-          dataSize > 0 else {
-        return []
-    }
-    let count = Int(dataSize) / MemoryLayout<CMIOObjectID>.size
-    var devices = [CMIOObjectID](repeating: 0, count: count)
-    var used: UInt32 = 0
-    guard CMIOObjectGetPropertyData(CMIOObjectID(kCMIOObjectSystemObject), &address, 0, nil, dataSize, &used, &devices) == kCMIOHardwareNoError else {
-        return []
-    }
+// All cameras, including virtual ones
+func cameraDevices() -> [CMIOObjectID] {
+    let system = CMIOObjectID(kCMIOObjectSystemObject)
+    var address = cmioAddress(kCMIOHardwarePropertyDevices)
+    var size: UInt32 = 0
+    guard CMIOObjectGetPropertyDataSize(system, &address, 0, nil, &size) == kCMIOHardwareNoError else { return [] }
+    var devices = [CMIOObjectID](repeating: 0, count: Int(size) / MemoryLayout<CMIOObjectID>.size)
+    guard CMIOObjectGetPropertyData(system, &address, 0, nil, size, &size, &devices) == kCMIOHardwareNoError else { return [] }
     return devices
 }
 
-// True if the given device is streaming to any process right now.
-// kCMIOObjectPropertyElementMain is the current SDK name (was kCMIOObjectPropertyElementMaster
-// on older toolchains); both are defined as 0, so swap the constant if this fails to compile.
+// Streaming to any app right now — the same signal as the green camera LED
 func isRunning(_ device: CMIOObjectID) -> Bool {
-    var address = CMIOObjectPropertyAddress(
-        mSelector: CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere),
-        mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
-        mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
-
-    guard CMIOObjectHasProperty(device, &address) else { return false }
-
+    var address = cmioAddress(kCMIODevicePropertyDeviceIsRunningSomewhere)
     var running: UInt32 = 0
-    var dataUsed: UInt32 = 0
-    let size = UInt32(MemoryLayout<UInt32>.size)
-    let status = CMIOObjectGetPropertyData(device, &address, 0, nil, size, &dataUsed, &running)
+    var used: UInt32 = 0
+    let status = CMIOObjectGetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &used, &running)
     return status == kCMIOHardwareNoError && running != 0
 }
 
@@ -82,15 +73,32 @@ func isCameraInUse() -> Bool {
     cameraDevices().contains(where: isRunning)
 }
 
+// MARK: - Permission
+
+// Fail loudly (exit 1 + reason on stderr) — without Screen Recording every check reads "no meeting"
+func requireScreenRecording() {
+    guard CGPreflightScreenCaptureAccess() else {
+        fputs("Screen Recording permission not granted — enable it for the app running the monitor (your terminal, or node under launchd) in System Settings → Privacy & Security → Screen Recording\n", stderr)
+        exit(1)
+    }
+}
+
 // MARK: - Main
 
-// Debug: list every on-screen window so meeting-title patterns can be confirmed on real hardware
+// Debug: list windows to tune isMeetingWindow
 if CommandLine.arguments.contains("--dump-windows") {
-    onScreenWindows().forEach { print("\($0.owner): \($0.title)") }
+    requireScreenRecording()
+    allWindows().forEach { print("\($0.owner): \($0.title)") }
     exit(0)
 }
 
+// Locked means OFF; checked before the permission since it needs none
+if isScreenLocked() {
+    print("false|false")
+    exit(0)
+}
+
+requireScreenRecording()
 let inMeeting = isInMeeting()
-// Camera only matters during a meeting; skip the query otherwise to avoid needless work
-let cameraInUse = inMeeting && isCameraInUse()
-print("\(inMeeting ? "true" : "false")|\(cameraInUse ? "true" : "false")")
+let cameraInUse = inMeeting && isCameraInUse() // Camera only matters during a meeting
+print("\(inMeeting)|\(cameraInUse)")

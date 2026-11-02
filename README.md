@@ -5,30 +5,16 @@ Automated "On Air" sign using a Raspberry Pi Pico 2 W — shows your meeting and
 - Meeting, camera off → YELLOW 🟡
 - Meeting, camera on → RED 🔴
 
-Works with Zoom, Google Meet, Slack Huddle, Amazon Chime, and Microsoft Teams. Only activates when connected to your home WiFi.
+Works with Zoom, Google Meet, Slack Huddle, Webex, and Microsoft Teams on macOS (the legacy Windows host also covers Amazon Chime, but not Webex). Only activates on your home network.
 
-## Setup
+## Hardware
+Wire the WS2812 NeoPixel ring data line to **GP4**. Print and assemble the enclosures from `enclosures/` — a snap-fit box for the NeoPixel ring and a case for the Pico 2 W (print settings in [`enclosures/README.md`](enclosures/README.md)).
+
+## Setup (macOS)
+The Mac writes the sign state to an [Adafruit IO](https://io.adafruit.com) feed and the Pico reads it over HTTPS, so the two don't need to share a network.
 
 ### Pico
-Wire the WS2812 NeoPixel ring data line to **GP4**.
-
-Print and assemble the enclosures from `enclosures/` — a snap-fit box for the NeoPixel ring and a case for the Pico 2 W. See [`enclosures/README.md`](enclosures/README.md) for print settings.
-
-The Pico firmware comes in two implementations — pick the one matching your host monitor (see below).
-
-#### Pico (push variant, pairs with the Windows host monitor)
-Upload `win/pico/main.py` and `win/pico/dashboard.html` to the Pico 2 W using Thonny. Create `win/pico/secrets.py` on the device:
-```python
-SSID = "<wifi_name>"
-PASSWORD = "<wifi_password>"
-WEBREPL_PW = "<webrepl_password>"
-```
-Assign the Pico a static IP via a DHCP reservation on your router so the hardcoded IP in `win/host/monitor.mjs` never changes. The Pico runs a local HTTP server and the host pushes state to it directly, so both must be on the same LAN.
-
-Optionally, upload `win/pico/onairsign.html` to your personal website for easy access to the dashboard without remembering the IP.
-
-#### Pico (pull variant, pairs with the macOS host monitor)
-Upload `mac/pico/main.py` to the Pico 2 W using Thonny. Create a feed named `on-air-sign` on [Adafruit IO](https://io.adafruit.com), then create `mac/pico/secrets.py` on the device:
+Create a feed named `on-air-sign` on Adafruit IO. Upload `mac/pico/main.py` to the Pico with Thonny, and create `secrets.py` on the device:
 ```python
 SSID = "<wifi_name>"
 PASSWORD = "<wifi_password>"
@@ -36,42 +22,32 @@ WEBREPL_PW = "<webrepl_password>"
 AIO_USERNAME = "<adafruit_io_username>"
 AIO_KEY = "<adafruit_io_key>"
 ```
-The Pico polls this feed over HTTPS and drives the sign from its value (`off`/`yellow`/`red`) — no LAN adjacency with the host required, and no inbound connections accepted. `mac/host` writing to the feed automatically is still in progress (see [mac/host/CLAUDE.md](mac/host/CLAUDE.md)); until then you can set the feed's value manually from the Adafruit IO dashboard to test the Pico side.
+Setting the feed's value (`off`/`yellow`/`red`) on the Adafruit IO dashboard changes the sign by hand.
 
-### Host monitor (Windows)
-Requires Node.js and PowerShell 7 (`pwsh`). Set the HOME_SSID environment variable:
-```powershell
-[System.Environment]::SetEnvironmentVariable("HOME_SSID", "<your_ssid>", "User")
-```
-Then run:
-```powershell
-node win/host/monitor.mjs
-```
-
-#### Autostart
-To run the monitor automatically on login via Windows Task Scheduler:
-1. Copy `win/host/launch-monitor.vbs.example` → `win/host/launch-monitor.vbs` and fill in your Node.js path and repo path
-2. Copy `win/host/On Air sign monitor.xml.example` → `win/host/On Air sign monitor.xml` and replace `DOMAIN\username`, `DATE`, and the paths in `<Actions>`
-3. Open Task Scheduler → Action → Import Task, and select `win\host\On Air sign monitor.xml`
-
-### Host monitor (macOS)
-Requires Node.js and the Xcode Command Line Tools (for `swiftc` — usually already installed). Build the native probe once, then run:
+### Host monitor
+Requires Node.js and the Xcode Command Line Tools (`swiftc`).
 ```bash
 cd mac/host
 ./build.sh
-export HOME_SSID="<your_ssid>"
-node monitor.js
+# On your home network, save your router's MAC to .env:
+echo "HOME_GATEWAY_MAC=$(arp -n "$(route -n get default | awk '/gateway:/ {print $2}')" | awk '{print $4}')" > .env
+node monitor.mjs
 ```
-On first run, grant these in System Settings → Privacy & Security: **Screen Recording** (so the probe can read meeting-app window titles — without it no meeting is detected) and **Location Services** for your terminal/Node (required by macOS to read the WiFi network name). Camera state needs no permission. See [mac/host/CLAUDE.md](mac/host/CLAUDE.md) for details.
+Grant **Screen Recording** (System Settings → Privacy & Security) to the app running the monitor — your terminal, or `node` under launchd. Without it no meeting is detected, and the reason is logged to `errors.log`.
 
-#### Autostart
-To run the monitor automatically on login via launchd:
-1. Copy `mac/host/com.onairsign.monitor.plist.example` → `mac/host/com.onairsign.monitor.plist` and fill in your Node.js path, repo path, and HOME_SSID
-2. Symlink or copy it into `~/Library/LaunchAgents/` and load it:
-   ```bash
-   cp "mac/host/com.onairsign.monitor.plist" ~/Library/LaunchAgents/
-   launchctl load ~/Library/LaunchAgents/com.onairsign.monitor.plist
-   ```
+> Work in progress: the host doesn't write to the Adafruit IO feed yet.
+
+To start on login, copy `mac/host/com.onairsign.monitor.plist.example` → `mac/host/com.onairsign.monitor.plist`, fill in your Node.js and repo paths, then:
+```bash
+cp "mac/host/com.onairsign.monitor.plist" ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.onairsign.monitor.plist
+```
+
+## Setup (Windows, legacy)
+No longer maintained. The host pushes state to the Pico over the local network, so both must be on the same LAN.
+
+- **Pico** — upload `win/pico/main.py` and `win/pico/dashboard.html`, and create `secrets.py` with `SSID`, `PASSWORD`, and `WEBREPL_PW`. Give the Pico a DHCP reservation matching the IP in `win/host/monitor.mjs`. Optionally host `win/pico/onairsign.html` on your website as a shortcut to the Pico's dashboard
+- **Host** — requires Node.js and PowerShell 7. Set `HOME_SSID` (`[System.Environment]::SetEnvironmentVariable("HOME_SSID", "<your_ssid>", "User")`) and run `node win/host/monitor.mjs`. For autostart, fill in `launch-monitor.vbs.example` and `On Air sign monitor.xml.example` (drop `.example`), then import the XML in Task Scheduler
 
 ---
 
