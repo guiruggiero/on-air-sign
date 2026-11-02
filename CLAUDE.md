@@ -19,7 +19,7 @@ Component details: [mac/host](mac/host/CLAUDE.md), [mac/pico](mac/pico/CLAUDE.md
 
 ## Roadmap
 
-1. `mac/host/monitor.mjs` writes state to the Adafruit IO feed instead of the Pico's LAN IP
+1. Flash `mac/pico/main.py` and verify the Pico follows the feed end to end
 2. Live On Air card on the website's admin dashboard (`website/admin.html`, separate repo) — read the feed over HTTPS (public-read feed, no key); manual control would need a backend holding the key
 
 ## Gotchas

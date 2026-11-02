@@ -29,13 +29,13 @@ Requires Node.js and the Xcode Command Line Tools (`swiftc`).
 ```bash
 cd mac/host
 ./build.sh
-# On your home network, save your router's MAC to .env:
-echo "HOME_GATEWAY_MAC=$(arp -n "$(route -n get default | awk '/gateway:/ {print $2}')" | awk '{print $4}')" > .env
+# On your home network, create .env with your router's MAC and Adafruit IO credentials:
+echo "HOME_ROUTER_MAC=$(arp -n "$(route -n get default | awk '/gateway:/ {print $2}')" | awk '{print $4}')" > .env
+echo "ADAFRUIT_IO_USERNAME=<username>" >> .env
+echo "ADAFRUIT_IO_KEY=<key>" >> .env   # Adafruit IO → My Key
 node monitor.mjs
 ```
 Grant **Screen Recording** (System Settings → Privacy & Security) to the app running the monitor — your terminal, or `node` under launchd. Without it no meeting is detected, and the reason is logged to `errors.log`.
-
-> Work in progress: the host doesn't write to the Adafruit IO feed yet.
 
 To start on login, copy `mac/host/com.onairsign.monitor.plist.example` → `mac/host/com.onairsign.monitor.plist`, fill in your Node.js and repo paths, then:
 ```bash

@@ -14,13 +14,13 @@ AIO_USERNAME = "<adafruit_io_username>"
 AIO_KEY = "<adafruit_io_key>"
 ```
 
-Until `mac/host` writes to the feed, test by setting the feed value by hand on the Adafruit IO dashboard — the Pico can't tell the two apart, which also makes the dashboard a manual override.
+`mac/host` writes the feed; setting its value by hand on the Adafruit IO dashboard works too (the Pico can't tell the two apart), which makes the dashboard a manual override.
 
 ## Architecture
 
 - **Feed polling** — every 3s, `GET /api/v2/{username}/feeds/on-air-sign/data/last` on `io.adafruit.com` with the `X-AIO-Key` header. HTTPS is done by hand (raw `socket` + `ssl`, manual chunked decoding)
 - **Values** — `"off"`, `"yellow"`, or `"red"`; anything else is logged and ignored (sign holds its state)
-- **Staleness + watchdog** — a datapoint whose `created_epoch` is older than 5 minutes (vs. the NTP-synced clock) is ignored, and the sign turns off if no fresh value arrives for 5 minutes. Covers Adafruit IO outages, Pico WiFi loss, and a host that went offline while the feed still says `"red"`. So the host must refresh the feed during a meeting well inside 5 minutes — throttled (e.g. ~60s) to respect Adafruit IO's rate limit
+- **Staleness + watchdog** — a datapoint whose `created_epoch` is older than 5 minutes (vs. the NTP-synced clock) is ignored, and the sign turns off if no fresh value arrives for 5 minutes. Covers Adafruit IO outages, Pico WiFi loss, and a host that went offline while the feed still says `"red"`. `mac/host` re-writes the value every 60s during a meeting to stay fresh
 - **LEDs** — 12-LED WS2812 ring on **GP4** via PIO (8 MHz, GRB)
 - **WiFi** — blinks green while connecting, solid green 3s on first boot, auto-reconnects; resets if the first connection fails after 20s
 - **Logging** — `logs.log`/`errors.log` on flash (PST via NTP, re-synced every 24h, trimmed at 20KB); read via WebREPL (no HTTP endpoints)

@@ -9,8 +9,10 @@ Requires Node.js and the Xcode Command Line Tools (`swiftc`).
 ```bash
 cd mac/host
 ./build.sh   # compiles probe.swift → probe; re-run after editing probe.swift
-# On your home network, save the router's MAC to .env (gitignored):
-echo "HOME_GATEWAY_MAC=$(arp -n "$(route -n get default | awk '/gateway:/ {print $2}')" | awk '{print $4}')" > .env
+# On your home network, create .env (gitignored) with the router's MAC and Adafruit IO credentials:
+echo "HOME_ROUTER_MAC=$(arp -n "$(route -n get default | awk '/gateway:/ {print $2}')" | awk '{print $4}')" > .env
+echo "ADAFRUIT_IO_USERNAME=<username>" >> .env
+echo "ADAFRUIT_IO_KEY=<key>" >> .env   # Adafruit IO → My Key
 node monitor.mjs
 ```
 
@@ -30,14 +32,12 @@ node monitor.mjs & tail -f logs.log
 
 `monitor.mjs` (Node.js built-ins only) polls every 5s:
 
-1. **Home** — the default gateway's MAC (`route` + `arp`) must match `HOME_GATEWAY_MAC`, ignoring case and leading zeros. The WiFi SSID is unreadable on modern macOS without a paid-developer entitlement. A full-tunnel VPN reads as "not home" (accepted — basically never used)
+1. **Home** — the default gateway's MAC (`route` + `arp`) must match `HOME_ROUTER_MAC`, ignoring case and leading zeros. The WiFi SSID is unreadable on modern macOS without a paid-developer entitlement. A full-tunnel VPN reads as "not home" (accepted — basically never used)
 2. **`probe`** — only if home
-3. **State** — OFF unless in a meeting; then RED if a camera is on, else YELLOW. The first poll always sends a state (clears a sign left on by a crash); during a meeting the state is re-sent every poll as a heartbeat
-4. **Errors** — the state is held and the error logged once until it changes; if it persists mid-meeting, the Pico's 5-minute watchdog turns the sign off
+3. **State** — OFF unless in a meeting; then RED if a camera is on, else YELLOW. The first poll always sends a state (clears a sign left on by a crash); each change is written to the Adafruit IO feed `on-air-sign` (`POST …/feeds/on-air-sign/data`), and during a meeting the value is re-written every 60s so the Pico's 5-minute staleness check never trips (~1 write/min, well under Adafruit IO's rate limit)
+4. **Errors** — a failed poll holds the state; a failed feed write rolls the state back so the next poll retries. Each error is logged once until it changes, with a "recovered" line after. If writes keep failing mid-meeting, the Pico's staleness check turns the sign off
 
-Also: notifications on transitions (`NOTIFY_ON_CHANGE`); `SIGINT`/`SIGTERM` stops polling, turns the sign off, and exits; `logs.log`/`errors.log` trimmed at 200KB.
-
-**Still pending (roadmap step 1)**: state goes to the Pico's LAN IP (`PICO_IP`) instead of the Adafruit IO feed `mac/pico/` reads.
+Also: notifications on transitions (`NOTIFY_ON_CHANGE`); `SIGINT`/`SIGTERM` stops polling, writes OFF, and exits; `logs.log`/`errors.log` trimmed at 200KB.
 
 `probe` checks, in order: **lock** (`CGSSessionScreenIsLocked`; locked → OFF, checked first since it needs no permission), **Screen Recording** (exits 1 if missing), **meeting** (searches all windows, including minimized, with `isMeetingWindow`), **camera** (only in a meeting; any CoreMediaIO device running — the green-LED signal).
 
@@ -58,4 +58,4 @@ Accepted gaps: Meet in a background tab with the floating window closed (OFF); t
 - `mac/host/probe.swift` — native probe, compiled to `probe` by `build.sh`
 - `mac/host/build.sh` — compiles the probe
 - `mac/host/com.onairsign.monitor.plist.example` — launchd template
-- `mac/host/.env` — gitignored config (`HOME_GATEWAY_MAC`)
+- `mac/host/.env` — gitignored config (`HOME_ROUTER_MAC`, `ADAFRUIT_IO_USERNAME`, `ADAFRUIT_IO_KEY`)

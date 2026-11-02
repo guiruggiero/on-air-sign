@@ -3,19 +3,20 @@ import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {statSync, readFileSync, writeFileSync, appendFileSync} from "node:fs";
 import {execFileSync, execFile} from "node:child_process";
-import http from "node:http";
 
 // Initializations
-const PICO_IP = "192.168.0.209";
 const NOTIFY_ON_CHANGE = true;
 const POLL_INTERVAL_MS = 5000; // 5 seconds
+const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute; re-send during a meeting, well inside the Pico's 5-minute staleness limit
 const ALIVE_LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const FEED_TIMEOUT_MS = 5000; // 5 seconds
 const STATES = {
-    OFF:    {endpoint: "/off",    label: "OFF ⚫"},
-    YELLOW: {endpoint: "/yellow", label: "YELLOW 🟡"},
-    RED:    {endpoint: "/red",    label: "RED 🔴"},
+    OFF:    {value: "off",    label: "OFF ⚫"},
+    YELLOW: {value: "yellow", label: "YELLOW 🟡"},
+    RED:    {value: "red",    label: "RED 🔴"},
 };
 let currentState = null;
+let lastSentAt = 0;
 let shuttingDown = false;
 
 // Logging
@@ -50,12 +51,19 @@ function logError(msg) {
     appendLine(ERR_PATH, log(msg));
 }
 
-// Log a recurring poll error only when it changes, so a persistent failure doesn't write a line every poll
-let lastPollError = null;
-function logPollError(msg) {
-    if (msg === lastPollError) return;
-    lastPollError = msg;
-    logError(msg);
+// Log a recurring error only when it changes, so a persistent failure doesn't write a line every poll.
+// Tracked per kind ("Polling", "Feed"), and a recovery is logged once
+const lastErrors = {};
+function logErrorOnce(kind, msg) {
+    if (lastErrors[kind] === msg) return;
+    lastErrors[kind] = msg;
+    logError(`${kind} error: ${msg}`);
+}
+
+function clearError(kind) {
+    if (!lastErrors[kind]) return;
+    delete lastErrors[kind];
+    log(`${kind} recovered`);
 }
 
 // Config from the gitignored .env next to this file; real environment variables win
@@ -67,15 +75,16 @@ try {
 }
 
 // Exit 0 so launchd doesn't relaunch every ~10s over a config error that won't fix itself
-if (!process.env.HOME_GATEWAY_MAC) {
-    logError(`HOME_GATEWAY_MAC is not set. Add it to ${ENV_PATH} — get it on your home network with: arp -n "$(route -n get default | awk '/gateway:/ {print $2}')"`);
+const missing = ["HOME_ROUTER_MAC", "ADAFRUIT_IO_USERNAME", "ADAFRUIT_IO_KEY"].filter((name) => !process.env[name]);
+if (missing.length) {
+    logError(`Missing in ${ENV_PATH}: ${missing.join(", ")}. Get the router MAC on your home network with: arp -n "$(route -n get default | awk '/gateway:/ {print $2}')"`);
     process.exit(0);
 }
 
-// Home = the default gateway's (router's) MAC matches HOME_GATEWAY_MAC. Normalized because arp drops
+// Home = the default gateway's (router's) MAC matches HOME_ROUTER_MAC. Normalized because arp drops
 // leading zeros ("9:a:..." not "09:0a:...")
 const normalizeMac = (mac) => mac.toLowerCase().split(":").map((octet) => octet.replace(/^0(?=.)/, "")).join(":");
-const HOME_GATEWAY_MAC = normalizeMac(process.env.HOME_GATEWAY_MAC);
+const HOME_ROUTER_MAC = normalizeMac(process.env.HOME_ROUTER_MAC);
 
 function isHome() {
     try {
@@ -83,7 +92,7 @@ function isHome() {
         const gatewayIp = route.match(/gateway:\s*(\S+)/)?.[1];
         if (!gatewayIp) return false;
         const arp = execFileSync("arp", ["-n", gatewayIp], {timeout: 2000, stdio: "pipe"}).toString();
-        return normalizeMac(arp.match(/ at (\S+)/)?.[1] ?? "") === HOME_GATEWAY_MAC;
+        return normalizeMac(arp.match(/ at (\S+)/)?.[1] ?? "") === HOME_ROUTER_MAC;
     } catch {
         return false; // Offline (no default route) or no ARP entry
     }
@@ -110,19 +119,36 @@ function notify(label) {
     });
 }
 
-// Set the sign color; onError lets the caller roll back so the next poll retries
-function callPico(state, onError, isTransition = false) {
-    const req = http.request({hostname: PICO_IP, port: 80, path: state.endpoint, method: "GET"}, (res) => {
-        res.resume(); // Drain the body to free the socket
-        log(`Sign → ${state.label} (HTTP ${res.statusCode})`);
-        if (isTransition && NOTIFY_ON_CHANGE && res.statusCode === 200) notify(state.label);
-    });
-    req.setTimeout(3000, () => req.destroy(new Error("Request timed out")));
-    req.on("error", (e) => {
-        logError(`Pico unreachable: ${e.message}`);
-        onError?.();
-    });
-    req.end();
+// Write the state to the Adafruit IO feed the Pico polls. Resolves true on success
+const FEED_URL = `https://io.adafruit.com/api/v2/${process.env.ADAFRUIT_IO_USERNAME}/feeds/on-air-sign/data`;
+async function sendState(state) {
+    try {
+        const res = await fetch(FEED_URL, {
+            method: "POST",
+            headers: {"X-AIO-Key": process.env.ADAFRUIT_IO_KEY, "Content-Type": "application/json"},
+            body: JSON.stringify({value: state.value}),
+            signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+        lastSentAt = Date.now();
+        clearError("Feed");
+        return true;
+    } catch (e) {
+        logErrorOnce("Feed", e.message);
+        return false;
+    }
+}
+
+// On a transition, update the state first so polls don't re-send it, and roll back on failure so the next poll retries
+async function transition(newState) {
+    const prevState = currentState;
+    currentState = newState;
+    if (!await sendState(newState)) {
+        if (currentState === newState) currentState = prevState; // Unless a newer transition already happened
+        return;
+    }
+    log(`Sign → ${newState.label}`);
+    if (prevState !== null && NOTIFY_ON_CHANGE) notify(newState.label);
 }
 
 // OFF unless home and in a meeting; then RED with the camera on, else YELLOW
@@ -135,22 +161,17 @@ function poll() {
             if (!match) throw new Error(`Unexpected probe output: ${output}`);
             if (match[1] === "true") newState = match[2] === "true" ? STATES.RED : STATES.YELLOW;
         }
-        if (lastPollError) {
-            log("Polling recovered");
-            lastPollError = null;
-        }
+        clearError("Polling");
     } catch (e) {
         if (shuttingDown || e.signal) return;
-        logPollError(`Error polling status: ${e.message}`);
-        return; // Hold the state; if this persists mid-meeting, the Pico's watchdog turns the sign off
+        logErrorOnce("Polling", e.message);
+        return; // Hold the state; if this persists mid-meeting, the Pico's staleness check turns the sign off
     }
 
     if (newState !== currentState) { // Transition — the first poll always sends, clearing a sign left on by a crash
-        const prevState = currentState;
-        currentState = newState;
-        callPico(newState, () => {currentState = prevState;}, prevState !== null);
-    } else if (newState !== STATES.OFF) { // Heartbeat for the Pico watchdog during a meeting
-        callPico(newState);
+        transition(newState);
+    } else if (newState !== STATES.OFF && Date.now() - lastSentAt >= REFRESH_INTERVAL_MS) { // Keep the value fresh during a meeting
+        sendState(newState);
     }
 }
 
@@ -161,13 +182,13 @@ function schedulePoll() {
     setTimeout(schedulePoll, POLL_INTERVAL_MS);
 }
 
-// Graceful shutdown: turn the sign off, then exit once the request had time to finish (3s timeout)
-function shutdown() {
+// Graceful shutdown: turn the sign off (the write times out after FEED_TIMEOUT_MS), then exit
+async function shutdown() {
     if (shuttingDown) return; // Ignore a second Ctrl-C
     shuttingDown = true;
     log("Shutting down - turning off sign...");
-    callPico(STATES.OFF);
-    setTimeout(() => process.exit(0), 3500);
+    if (await sendState(STATES.OFF)) log(`Sign → ${STATES.OFF.label}`);
+    process.exit(0);
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
