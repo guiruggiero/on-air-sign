@@ -180,10 +180,10 @@ def connect_mqtt():
     mqtt.publish(f"{ADAFRUIT_IO_TOPIC}/get", b"")
     log("Connected to Adafruit IO")
 
-# Heartbeat: the color actually shown, uptime, and free memory (publishing also serves as the keepalive)
+# Heartbeat: the color actually shown, uptime, and memory in bytes (publishing also serves as the keepalive)
 def send_heartbeat():
     gc.collect()
-    mqtt.publish(HEARTBEAT_TOPIC, json.dumps({"state": shown, "uptime_s": time.time() - boot_time, "mem_free": gc.mem_free()}))
+    mqtt.publish(HEARTBEAT_TOPIC, json.dumps({"state": shown, "uptime_s": time.time() - boot_time, "mem_used": gc.mem_alloc(), "mem_free": gc.mem_free()}))
 
 mqtt_connected = False
 last_ping = time.ticks_ms()
