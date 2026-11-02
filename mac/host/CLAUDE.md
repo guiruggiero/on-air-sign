@@ -18,7 +18,7 @@ node monitor.mjs
 
 **Screen Recording** is the only permission — without it window titles are empty and no meeting is detected (`probe` then exits 1 and `monitor.mjs` logs why). macOS grants it to the app that launches `probe` (your terminal, or `node` under launchd), so rebuilding `probe` never needs a re-grant.
 
-Autostart: copy `com.onairsign.monitor.plist.example` → `com.onairsign.monitor.plist` (gitignored), fill in `<PATH_TO_NODE>` and `<PATH_TO_REPO>`, copy it to `~/Library/LaunchAgents/`, and `launchctl load` it; grant Screen Recording to that `node` (not yet verified — check `errors.log` after the first autostart). `KeepAlive SuccessfulExit=false` relaunches crashes only, so a graceful stop stays off — which is why config errors exit 0.
+Autostart: copy `com.onairsign.monitor.plist.example` → `com.onairsign.monitor.plist` (gitignored), fill in `<PATH_TO_NODE>` and `<PATH_TO_REPO>`, copy it to `~/Library/LaunchAgents/`, and `launchctl load` it; grant Screen Recording to the real binary behind it (`realpath "$(which node)"`, e.g. `/opt/homebrew/Cellar/node@24/…/bin/node`; re-grant after Node upgrades — the monitor notifies when it's lost). `KeepAlive SuccessfulExit=false` relaunches crashes only, so a graceful stop stays off — which is why config errors exit 0.
 
 ## Debugging
 
@@ -37,7 +37,7 @@ node monitor.mjs & tail -f logs.log
 3. **State** — OFF unless in a meeting; then RED if a camera is on, else YELLOW. Each change is written to the feed `on-air-sign` (`POST …/feeds/on-air-sign/data`), including on the first poll (clears a sign left on by a crash). During a meeting the value is re-written every 60s so the Pico's 5-minute staleness check never trips
 4. **Errors** — a failed poll holds the state; a failed write rolls it back so the next poll retries. Each error is logged once until it changes
 
-Also: notifications on transitions (`NOTIFY_ON_CHANGE`); `SIGINT`/`SIGTERM` stops polling, writes OFF, and exits; `logs.log`/`errors.log` trimmed at 200KB.
+Also: a macOS notification on each new polling error, saying what to do for the fixable ones (Screen Recording names the exact `node` binary to grant; a missing probe says to run `./build.sh`). Screen Recording is typically lost after a Node upgrade — Homebrew's `node` is ad-hoc signed, so every upgrade needs a re-grant. Optional notifications on transitions (`NOTIFY_ON_CHANGE`, off); `SIGINT`/`SIGTERM` stops polling, writes OFF, and exits; `logs.log`/`errors.log` trimmed at 200KB.
 
 `probe` checks, in order: **lock** (`CGSSessionScreenIsLocked`; locked → OFF, checked first since it needs no permission), **Screen Recording** (exits 1 if missing), **meeting** (searches all windows, including minimized, with `isMeetingWindow`), **camera** (only in a meeting; any CoreMediaIO device running — the green-LED signal).
 

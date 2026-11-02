@@ -5,7 +5,7 @@ import {statSync, readFileSync, writeFileSync, appendFileSync} from "node:fs";
 import {execFileSync, execFile} from "node:child_process";
 
 // Initializations
-const NOTIFY_ON_CHANGE = true;
+const NOTIFY_ON_CHANGE = false; // Notify on every sign change (always on for errors)
 const POLL_INTERVAL_MS = 3000; // 3 seconds; caps writes at 20/min
 const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute; re-send during a meeting, well inside the Pico's 5-minute staleness limit
 const FEED_TIMEOUT_MS = 5000; // 5 seconds
@@ -51,12 +51,13 @@ function logError(msg) {
 }
 
 // Log a recurring error only when it changes, so a persistent failure doesn't write a line every poll.
-// Tracked per kind ("Polling", "Feed"), and a recovery is logged once
+// Tracked per kind ("Polling", "Feed"), and a recovery is logged once. Returns true when newly logged
 const lastErrors = {};
 function logErrorOnce(kind, msg) {
-    if (lastErrors[kind] === msg) return;
+    if (lastErrors[kind] === msg) return false;
     lastErrors[kind] = msg;
     logError(`${kind} error: ${msg}`);
+    return true;
 }
 
 function clearError(kind) {
@@ -99,21 +100,26 @@ function isHome() {
 
 // Native probe, compiled by build.sh (not here — swiftc usually isn't on launchd's PATH).
 // Prints "<inMeeting>|<cameraInUse>"; exits 1 with the reason on stderr
+// Errors you can fix carry an `action`, which becomes the notification text
 const PROBE_BIN = join(HOST_DIR, "probe");
+const probeError = (message, action) => Object.assign(new Error(message), {action});
 function runProbe() {
     try {
         return execFileSync(PROBE_BIN, {timeout: 2000, stdio: "pipe"}).toString().trim();
     } catch (e) {
-        if (e.code === "ENOENT" || e.code === "EACCES") throw new Error(`Probe at ${PROBE_BIN} is missing or not executable — run ./build.sh`);
+        if (e.code === "ENOENT" || e.code === "EACCES") throw probeError(`Probe at ${PROBE_BIN} is missing or not executable`, "Rebuild the probe: run ./build.sh in mac/host");
         if (e.code === "ETIMEDOUT") throw new Error("Probe timed out after 2s");
         if (e.signal) throw e; // Killed by Ctrl-C/shutdown — the caller ignores it
-        throw new Error(`Probe failed: ${e.stderr?.toString().trim() || e.message}`);
+        const stderr = e.stderr?.toString().trim() || e.message;
+        // process.execPath is the real node binary, so after a Node upgrade this names the new one to grant
+        if (stderr.includes("Screen Recording")) throw probeError(`Probe failed: ${stderr}`, `Grant Screen Recording to ${process.execPath} (System Settings → Privacy & Security → Screen & System Audio Recording), then restart the monitor`);
+        throw new Error(`Probe failed: ${stderr}`);
     }
 }
 
 // macOS notification via osascript
-function notify(label) {
-    execFile("osascript", ["-e", `display notification ${JSON.stringify(label)} with title "On Air sign"`], (e) => {
+function notify(message, title = "On Air sign") {
+    execFile("osascript", ["-e", `display notification ${JSON.stringify(message)} with title ${JSON.stringify(title)}`], (e) => {
         if (e) logError(`Notification failed: ${e.message}`);
     });
 }
@@ -163,7 +169,8 @@ function poll() {
         clearError("Polling");
     } catch (e) {
         if (shuttingDown || e.signal) return;
-        logErrorOnce("Polling", e.message);
+        // Polling errors need action (e.g. Screen Recording lost after a Node upgrade), so also notify; feed errors fix themselves
+        if (logErrorOnce("Polling", e.message)) notify(e.action ?? e.message, "On Air sign needs attention");
         return; // Hold the state; if this persists mid-meeting, the Pico's staleness check turns the sign off
     }
 

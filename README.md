@@ -35,7 +35,7 @@ echo "ADAFRUIT_IO_USERNAME=<username>" >> .env
 echo "ADAFRUIT_IO_KEY=<key>" >> .env   # Adafruit IO → My Key
 node monitor.mjs
 ```
-Grant **Screen Recording** (System Settings → Privacy & Security) to the app running the monitor — your terminal, or `node` under launchd. Without it no meeting is detected, and the reason is logged to `errors.log`.
+Grant **Screen Recording** (System Settings → Privacy & Security) to the app running the monitor — your terminal, or under launchd the real `node` binary (`realpath "$(which node)"`). Without it no meeting is detected; the monitor logs it and shows a notification. Homebrew Node upgrades need a re-grant.
 
 To start on login, copy `mac/host/com.onairsign.monitor.plist.example` → `mac/host/com.onairsign.monitor.plist`, fill in your Node.js and repo paths, then:
 ```bash
