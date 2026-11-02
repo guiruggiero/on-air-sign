@@ -4,17 +4,7 @@ Pairs with `mac/host/`. `main.py` is the entire firmware: a single-file MicroPyt
 
 ## Deploying
 
-1. With the Pico on WiFi, install the MQTT client once (it lives in `/lib` and survives `main.py` updates): Thonny → Tools → Manage packages → `umqtt.simple`, or in the REPL `import mip; mip.install("umqtt.simple")`
-2. Upload `main.py` with Thonny (runs on boot)
-3. Create `secrets.py` on the Pico (gitignored):
-
-```python
-SSID = "<wifi_name>"
-PASSWORD = "<wifi_password>"
-WEBREPL_PW = "<webrepl_password>"
-ADAFRUIT_IO_USERNAME = "<adafruit_io_username>"
-ADAFRUIT_IO_KEY = "<adafruit_io_key>"
-```
+See the root `README.md` (Setup → Pico). `umqtt.simple` lives in `/lib` and survives `main.py` updates; `secrets.py` is gitignored.
 
 `mac/host` writes the feed over HTTP; setting its value by hand on the Adafruit IO dashboard works too (the Pico can't tell the two apart), which makes the dashboard a manual override. A manual value can add a hold in minutes, e.g. `red:60`: it stays that long instead of 5 minutes, unless the host changes state first.
 

@@ -4,16 +4,7 @@ Pairs with `win/pico/`. No Windows machine is available anymore, so this can't b
 
 ## Running
 
-```powershell
-[System.Environment]::SetEnvironmentVariable("HOME_SSID", "<network_name>", "User")
-node win/host/monitor.mjs
-```
-
-Autostart via Task Scheduler — the real files are gitignored (username/SID), so start from the templates:
-
-1. Copy `launch-monitor.vbs.example` → `launch-monitor.vbs` and fill in the Node and repo paths
-2. Copy `On Air sign monitor.xml.example` → `On Air sign monitor.xml`; edit `DOMAIN\username`, `DATE`, and the paths in `<Arguments>` and `<WorkingDirectory>`
-3. Task Scheduler → Action → Import Task → select `win\host\On Air sign monitor.xml`
+See the root `README.md` (Setup → Windows, legacy). The autostart files are gitignored (username/SID), so start from the `.example` templates.
 
 Test the poll script on its own:
 

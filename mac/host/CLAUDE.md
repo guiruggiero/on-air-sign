@@ -4,21 +4,11 @@ Pairs with `mac/pico/`. `monitor.mjs` decides the sign state; the compiled `prob
 
 ## Setup
 
-Requires Node.js and the Xcode Command Line Tools (`swiftc`).
-
-```bash
-cd mac/host
-./build.sh   # compiles probe.swift → probe; re-run after editing probe.swift
-# On your home network, create .env (gitignored) with the router's MAC and Adafruit IO credentials:
-echo "HOME_ROUTER_MAC=$(arp -n "$(route -n get default | awk '/gateway:/ {print $2}')" | awk '{print $4}')" > .env
-echo "ADAFRUIT_IO_USERNAME=<username>" >> .env
-echo "ADAFRUIT_IO_KEY=<key>" >> .env   # Adafruit IO → My Key
-node monitor.mjs
-```
+See the root `README.md` (Setup → Host monitor). `./build.sh` compiles `probe.swift` → `probe`; re-run after editing it. `.env` is gitignored.
 
 **Screen Recording** is the only permission — without it window titles are empty and no meeting is detected (`probe` then exits 1 and `monitor.mjs` logs why). macOS grants it to the app that launches `probe` (your terminal, or `node` under launchd), so rebuilding `probe` never needs a re-grant.
 
-Autostart: copy `com.onairsign.monitor.plist.example` → `com.onairsign.monitor.plist` (gitignored), fill in `<PATH_TO_NODE>` and `<PATH_TO_REPO>`, copy it to `~/Library/LaunchAgents/`, and `launchctl load` it; grant Screen Recording to the real binary behind it (`realpath "$(which node)"`, e.g. `/opt/homebrew/Cellar/node@24/…/bin/node`; re-grant after Node upgrades — the monitor notifies when it's lost). `KeepAlive SuccessfulExit=false` relaunches crashes only, so a graceful stop stays off — which is why config errors exit 0.
+Autostart (steps in the README; `com.onairsign.monitor.plist` is gitignored): grant Screen Recording to the real binary behind launchd (`realpath "$(which node)"`, e.g. `/opt/homebrew/Cellar/node@24/…/bin/node`). `KeepAlive SuccessfulExit=false` relaunches crashes only, so a graceful stop stays off — which is why config errors exit 0.
 
 ## Debugging
 

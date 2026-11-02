@@ -17,10 +17,6 @@ Component details: [mac/host](mac/host/CLAUDE.md), [mac/pico](mac/pico/CLAUDE.md
 | YELLOW | Meeting active, camera off |
 | RED    | Meeting active, camera on  |
 
-## Roadmap
-
-1. Admin card buttons: the live card (`website/admin.html`, separate repo) already reads the `pico` feed; OFF/YELLOW/RED buttons would write e.g. `red:60` to `on-air-sign` through a `guiddleware` route that verifies the owner's Firebase sign-in and holds the Adafruit IO key
-
 ## Gotchas
 
 - **Pico IP**: DHCP reservation at `192.168.0.209`

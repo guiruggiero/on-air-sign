@@ -14,7 +14,7 @@ Upload `main.py` and `dashboard.html` with Thonny (`main.py` runs on boot). Crea
 - **WiFi** — blinks green while connecting, solid green 3s on first boot (skipped on reconnect), auto-reconnects and restarts the server; resets if the first connection fails after 20s
 - **Logging** — `logs.log`/`errors.log` on flash (PST via NTP, re-synced every 24h, trimmed at 20KB)
 
-The website's admin dashboard can't fetch `/stats` live: the page is HTTPS and the Pico is plain HTTP on the LAN, so the browser blocks it as mixed content. Link-outs (and `onairsign.html`'s redirect) still work, since top-level navigation isn't mixed content. The `mac/` pairing avoids this (the card reads Adafruit IO over HTTPS) — see the roadmap in the root `CLAUDE.md`.
+The website's admin dashboard can't fetch `/stats` live: the page is HTTPS and the Pico is plain HTTP on the LAN, so the browser blocks it as mixed content. Link-outs (and `onairsign.html`'s redirect) still work, since top-level navigation isn't mixed content.
 
 ## Key files
 
